@@ -9,27 +9,19 @@ const DeviceNode = memo(({ data, selected }) => {
 
   return (
     <div className={`device-node ${selected ? 'selected' : ''}`}>
-      <Handle 
-        type="target" 
-        position={Position.Top} 
-        style={{ width: '12px', height: '12px', background: 'var(--c-border-lit)', border: '2px solid var(--c-bg-deep)' }} 
-      />
-      
+      <Handle type="target" position={Position.Top} className="device-handle" />
+
       <div className="device-node-type-badge">{def?.name || data.type}</div>
       {iconSrc ? (
         <img src={iconSrc} alt="" className="device-node-icon" draggable={false} />
       ) : (
         <div className="device-node-emoji">{def?.icon || '📦'}</div>
       )}
-      
+
       {data.label && <div className="device-node-name">{data.label}</div>}
       {data.ip && <div className="device-node-ip">{data.ip}</div>}
-      
-      <Handle 
-        type="source" 
-        position={Position.Bottom} 
-        style={{ width: '12px', height: '12px', background: 'var(--c-accent)', border: '2px solid var(--c-bg-deep)' }} 
-      />
+
+      <Handle type="source" position={Position.Bottom} className="device-handle" />
     </div>
   );
 });

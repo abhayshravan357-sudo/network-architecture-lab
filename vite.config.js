@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: '/network-architecture-lab/',
+
   plugins: [react()],
   server: {
     host: '0.0.0.0',

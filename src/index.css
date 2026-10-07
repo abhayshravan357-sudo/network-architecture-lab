@@ -1212,64 +1212,88 @@ hr, .divider {
 
 .palette-item-count.low { color: var(--c-warning); }
 
-/* Canvas */
+/* Canvas — React Flow is the workspace. The <Background>
+   component draws the topology grid; this wrapper only
+   provides the base color. */
 .builder-canvas {
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(59,130,246,0.03) 0%, transparent 60%),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 39px,
-      rgba(148,163,184,0.04) 39px,
-      rgba(148,163,184,0.04) 40px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 39px,
-      rgba(148,163,184,0.04) 39px,
-      rgba(148,163,184,0.04) 40px
-    );
+  background: var(--c-bg-deep);
 }
 
-/* ReactFlow overrides */
+/* ReactFlow overrides — theme the native React Flow chrome */
 .react-flow__node { cursor: pointer; }
 .react-flow__edge { cursor: pointer; }
-.react-flow__background { opacity: 0; }
+
+.react-flow__edge:hover .react-flow__edge-path,
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--c-accent) !important;
+  stroke-width: 2.5px !important;
+}
+
+.react-flow__connection-path {
+  stroke: var(--c-accent) !important;
+  stroke-width: 2px !important;
+  stroke-dasharray: 6 4 !important;
+}
+
+.react-flow__handle {
+  width: 11px;
+  height: 11px;
+  background: var(--c-bg-elevated);
+  border: 2px solid var(--c-accent);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.react-flow__handle:hover,
+.react-flow__handle.connectingfrom,
+.react-flow__handle.connectingto {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+  background: var(--c-accent);
+}
+
 .react-flow__controls {
   background: var(--c-bg-elevated) !important;
   border: 1px solid var(--c-border) !important;
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-md) !important;
+  overflow: hidden;
 }
+
 .react-flow__controls-button {
   background: transparent !important;
   border: none !important;
+  border-bottom: 1px solid var(--c-border) !important;
   color: var(--c-text-muted) !important;
 }
+
 .react-flow__controls-button:hover {
   background: rgba(59,130,246,0.1) !important;
   color: var(--c-text) !important;
 }
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
 .react-flow__minimap {
   background: var(--c-bg-elevated) !important;
   border: 1px solid var(--c-border) !important;
   border-radius: var(--radius-md) !important;
 }
 
-/* Device Node */
+/* Device Node — compact network equipment, not a dashboard card */
 .device-node {
   background: var(--c-bg-elevated);
   border: 1.5px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
+  border-radius: 10px;
+  padding: 7px 12px 9px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  min-width: 84px;
+  gap: 3px;
+  min-width: 92px;
   color: var(--c-text);
   box-shadow: var(--shadow-sm);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
@@ -1287,26 +1311,18 @@ hr, .divider {
   box-shadow: 0 0 0 2px rgba(56,189,248,0.25), var(--shadow-md);
 }
 
-.device-node-emoji { font-size: 1.6rem; line-height: 1; }
-.device-node-icon { width: 1.6rem; height: 1.6rem; line-height: 1; }
-.device-node-name { font-size: 0.72rem; font-weight: 600; color: var(--c-text); text-align: center; }
+.device-node-emoji { font-size: 1.4rem; line-height: 1; }
+.device-node-icon { width: 1.5rem; height: 1.5rem; line-height: 1; }
+.device-node-name { font-size: 0.72rem; font-weight: 600; color: var(--c-text); text-align: center; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .device-node-ip { font-size: 0.62rem; color: var(--c-accent-soft); font-family: 'JetBrains Mono', monospace; }
 .device-node-vlan { font-size: 0.6rem; color: var(--c-text-dim); }
 
 .device-node-type-badge {
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%);
   font-size: 0.55rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  padding: 1px 6px;
-  border-radius: var(--radius-pill);
-  background: var(--c-bg-deep);
-  border: 1px solid var(--c-border);
-  color: var(--c-text-muted);
+  color: var(--c-text-dim);
   white-space: nowrap;
 }
 

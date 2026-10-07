@@ -6,7 +6,7 @@
  * Asset library: public/assets/<category>/<name>.svg
  */
 
-const asset = (path) => `/assets/${path}.svg`;
+const asset = (path) => `${import.meta.env.BASE_URL}assets/${path}.svg`;
 
 /** Physical + network devices (builder palette, canvas nodes, resource pool) */
 export const deviceAssets = {
@@ -25,6 +25,7 @@ export const deviceAssets = {
   printer: asset('devices/printer'),
   ipCamera: asset('devices/ip-camera'),
   ipPhone: asset('devices/ip-phone'),
+  box: asset('devices/box'),
 };
 
 /** Virtual network functions (NFV stage palette + chain) */
@@ -101,6 +102,10 @@ export const learningAssets = {
   failure: asset('learning/failure'),
   score: asset('learning/score'),
   achievement: asset('learning/achievement'),
+  radio: asset('learning/radio'),
+  celebration: asset('learning/celebration'),
+  book: asset('learning/book'),
+  brain: asset('learning/brain'),
 };
 
 /** Home screen mode cards */
@@ -114,6 +119,11 @@ export const modeAssets = {
 /** Brand */
 export const uiAssets = {
   logo: asset('ui/logo'),
+  clipboard: asset('ui/clipboard'),
+  monitor: asset('ui/monitor'),
+  bolt: asset('ui/bolt'),
+  chart: asset('ui/chart'),
+  shield: asset('ui/shield'),
 };
 
 export default {

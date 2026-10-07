@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   addEdge,
@@ -171,6 +172,22 @@ export default function NetworkBuilder() {
   const nodes = useGameStore((s) => s.network.rfNodes);
   const edges = useGameStore((s) => s.network.rfEdges);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  // The `fitView` prop cannot be used here: with an empty canvas it
+  // fires when the FIRST dropped node is measured and zooms to
+  // maxZoom to fit a single device. Instead, fit once on mount only
+  // when a saved topology is being restored.
+  const hasFittedView = useRef(false);
+
+  useEffect(() => {
+    if (!reactFlowInstance || hasFittedView.current) return;
+    if (useGameStore.getState().network.rfNodes.length > 0) {
+      hasFittedView.current = true;
+      const timer = setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2 });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [reactFlowInstance]);
 
   const scenario = getScenario(activeScenarioId);
   if (!scenario) return null;
@@ -202,7 +219,12 @@ export default function NetworkBuilder() {
     (params) =>
       setRFEdges(
         addEdge(
-          { ...params, animated: true, style: { stroke: 'var(--c-border-lit)', strokeWidth: 2 } },
+          {
+            ...params,
+            type: 'straight',
+            animated: false,
+            style: { stroke: 'var(--c-border-lit)', strokeWidth: 2 },
+          },
           useGameStore.getState().network.rfEdges
         )
       ),
@@ -296,16 +318,15 @@ export default function NetworkBuilder() {
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
+          defaultEdgeOptions={{ type: 'straight', animated: false }}
         >
-          <Background color="var(--c-border)" gap={20} size={1} />
+          <Background variant={BackgroundVariant.Lines} gap={24} size={1} color="rgba(148, 163, 184, 0.13)" />
           <Controls />
-          <MiniMap 
+          <MiniMap
             nodeColor={(n) => {
-              if (n.data.type === 'firewall') return 'var(--c-danger)';
-              if (n.data.type === 'server') return 'var(--c-success)';
-              return 'var(--c-primary)';
+              if (n.data.type === 'firewall') return '#f87171';
+              if (n.data.type === 'server') return '#34d399';
+              return '#3b82f6';
             }}
             maskColor="rgba(6, 13, 26, 0.7)"
           />

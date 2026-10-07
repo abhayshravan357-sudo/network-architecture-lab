@@ -1,8 +1,0 @@
-{
-  "id": "traffic-surge",
-  "name": "Traffic Surge",
-  "trigger": "peak demand or planned event",
-  "affects": ["core links", "firewalls", "load balancers"],
-  "response": "Increase processing capacity, reroute traffic, or scale VNFs to maintain service quality.",
-  "expectedOutcome": "Service remains available and latency stays within acceptable limits."
-}

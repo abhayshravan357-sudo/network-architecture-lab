@@ -187,32 +187,6 @@ export const useGameStore = create(
         set({ quizScore: score });
       },
 
-      // ── Resource pool ─────────────────────────────────────
-
-      initResourcePool(pool) {
-        set((state) => ({
-          network: { ...state.network, remainingResources: { ...pool } },
-        }));
-      },
-
-      consumeResource(deviceType) {
-        set((state) => {
-          const remaining = { ...state.network.remainingResources };
-          if ((remaining[deviceType] ?? 0) > 0) {
-            remaining[deviceType] -= 1;
-          }
-          return { network: { ...state.network, remainingResources: remaining } };
-        });
-      },
-
-      returnResource(deviceType) {
-        set((state) => {
-          const remaining = { ...state.network.remainingResources };
-          remaining[deviceType] = (remaining[deviceType] ?? 0) + 1;
-          return { network: { ...state.network, remainingResources: remaining } };
-        });
-      },
-
       // ── Network builder ───────────────────────────────────
 
       setRFNodes(rfNodes) {
