@@ -1,0 +1,38 @@
+[
+  {
+    "id": "vrouter",
+    "name": "vRouter",
+    "category": "routing",
+    "cpu": 2,
+    "memory": 4,
+    "throughput": 500,
+    "lifecycle": ["instantiate", "configure", "monitor", "scale", "terminate"]
+  },
+  {
+    "id": "vfirewall",
+    "name": "vFirewall",
+    "category": "security",
+    "cpu": 3,
+    "memory": 6,
+    "throughput": 600,
+    "lifecycle": ["instantiate", "configure", "connect", "monitor", "migrate", "terminate"]
+  },
+  {
+    "id": "vloadbalancer",
+    "name": "vLoadBalancer",
+    "category": "load-balancing",
+    "cpu": 2,
+    "memory": 4,
+    "throughput": 700,
+    "lifecycle": ["instantiate", "configure", "scale", "monitor", "terminate"]
+  },
+  {
+    "id": "vids",
+    "name": "vIDS",
+    "category": "security",
+    "cpu": 4,
+    "memory": 8,
+    "throughput": 450,
+    "lifecycle": ["instantiate", "connect", "monitor", "migrate", "terminate"]
+  }
+]

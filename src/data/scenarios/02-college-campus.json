@@ -1,0 +1,32 @@
+{
+  "id": "college-campus",
+  "title": "College Campus",
+  "story": "A university must support labs, administration, faculty, dorms, and guests while maintaining secure segmentation and scalable wireless access across multiple buildings.",
+  "users": ["students", "faculty", "guests", "administration"],
+  "departments": ["engineering", "library", "administration", "student housing"],
+  "locations": ["main hall", "science block", "library", "dormitories"],
+  "requirements": {
+    "segmentation": "required",
+    "internet": "required",
+    "wireless": "required",
+    "centralizedServices": "required",
+    "availability": "high"
+  },
+  "concepts": {
+    "VLAN": "highly-relevant",
+    "inter-VLAN routing": "highly-relevant",
+    "DHCP": "highly-relevant",
+    "DNS": "relevant",
+    "ACL": "highly-relevant",
+    "wireless access": "required"
+  },
+  "protocols": ["DHCP", "DNS", "VLAN", "ACL", "OSPF"],
+  "validationRules": [
+    "Student, faculty, and admin traffic should not be merged.",
+    "Wireless users must be assigned correct access policies.",
+    "Core services should be centralized and accessible to appropriate segments."
+  ],
+  "sdnFocus": ["traffic engineering", "centralized access control"],
+  "nfvFocus": ["vFirewall", "vLoadBalancer", "vIDS"],
+  "simulationEvents": ["traffic-surge"]
+}

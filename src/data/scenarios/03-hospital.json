@@ -1,0 +1,31 @@
+{
+  "id": "hospital",
+  "title": "Hospital",
+  "story": "A hospital needs patient monitoring, administrative systems, clinical applications, and guest access while ensuring strict integrity and uptime for critical services.",
+  "users": ["clinical staff", "administration", "patients", "guests"],
+  "departments": ["clinical", "diagnostics", "administration", "guest services"],
+  "locations": ["emergency", "ICU", "administration floors", "internet edge"],
+  "requirements": {
+    "segmentation": "required",
+    "internet": "required",
+    "wireless": "required",
+    "centralizedServices": "required",
+    "availability": "critical"
+  },
+  "concepts": {
+    "ACL": "highly-relevant",
+    "redundancy": "highly-relevant",
+    "segmentation": "highly-relevant",
+    "firewall": "required",
+    "availability": "critical"
+  },
+  "protocols": ["ACL", "NAT", "VLAN", "OSPF"],
+  "validationRules": [
+    "Critical clinical services must be isolated and resilient.",
+    "Guest traffic must not access patient or administrative systems.",
+    "High availability should be represented in the design."
+  ],
+  "sdnFocus": ["policy enforcement", "resilience"],
+  "nfvFocus": ["vFirewall", "vIDS"],
+  "simulationEvents": ["traffic-surge", "node-failure"]
+}

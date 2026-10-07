@@ -1,0 +1,29 @@
+[
+  {
+    "id": "control-plane",
+    "title": "Control Plane",
+    "what": "The logic that decides how traffic should be handled.",
+    "why": "A network needs centralized decision-making for policy and routing intelligence.",
+    "when": "When the network requires centrally managed rules and traffic engineering.",
+    "example": "The SDN controller decides traffic paths for network segments.",
+    "scenarioApplication": "Campus or enterprise networks with many switches and policy changes."
+  },
+  {
+    "id": "data-plane",
+    "title": "Data Plane",
+    "what": "The forwarding path that moves packets according to installed rules.",
+    "why": "Traffic must be carried quickly and consistently based on network policy.",
+    "when": "Whenever traffic moves from source to destination.",
+    "example": "A switch forwards frames based on the table installed by the controller.",
+    "scenarioApplication": "Every network design stage, but especially dynamic traffic control."
+  },
+  {
+    "id": "flow-management",
+    "title": "Flow Management",
+    "what": "The control of how traffic flows across the infrastructure.",
+    "why": "To enforce quality, security, and efficient routing based on policy.",
+    "when": "When multiple service paths or priority classes must coexist.",
+    "example": "Institute access policies with route prioritization and inspection.",
+    "scenarioApplication": "Multi-tenant or enterprise networks with distinct service classes."
+  }
+]

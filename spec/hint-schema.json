@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HintDefinition",
+  "type": "object",
+  "required": ["id", "level", "text"],
+  "properties": {
+    "id": { "type": "string" },
+    "level": { "type": "integer", "minimum": 1 },
+    "text": { "type": "string" }
+  }
+}

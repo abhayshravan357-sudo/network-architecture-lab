@@ -1,0 +1,83 @@
+[
+  {
+    "id": "router",
+    "name": "Router",
+    "role": "routing",
+    "layer": "network",
+    "supports": ["routing", "NAT", "interconnection"],
+    "connections": ["ethernet", "fiber", "wireless"],
+    "notes": "Connects networks and forwards traffic between subnets or external services."
+  },
+  {
+    "id": "switch",
+    "name": "L2 Switch",
+    "role": "switching",
+    "layer": "data-link",
+    "supports": ["VLAN", "local-bridging"],
+    "connections": ["ethernet", "fiber"],
+    "notes": "Provides local switching for hosts within the same broadcast domain."
+  },
+  {
+    "id": "l3-switch",
+    "name": "L3 Switch",
+    "role": "switching-routing",
+    "layer": "network",
+    "supports": ["VLAN", "inter-VLAN routing", "routing"],
+    "connections": ["ethernet", "fiber"],
+    "notes": "Acts as a switch for local access and a router for inter-subnet traffic."
+  },
+  {
+    "id": "firewall",
+    "name": "Firewall",
+    "role": "security",
+    "layer": "network-security",
+    "supports": ["ACL", "traffic filtering", "inspection"],
+    "connections": ["ethernet", "fiber"],
+    "notes": "Controls east-west and north-south traffic according to policy."
+  },
+  {
+    "id": "server",
+    "name": "Server",
+    "role": "application-service",
+    "layer": "application",
+    "supports": ["DNS", "DHCP", "hosting"],
+    "connections": ["ethernet", "fiber"],
+    "notes": "Hosts user-facing or shared services such as authentication, storage, or provisioning."
+  },
+  {
+    "id": "pc",
+    "name": "PC",
+    "role": "user-endpoint",
+    "layer": "access",
+    "supports": ["client-access"],
+    "connections": ["ethernet", "wireless"],
+    "notes": "General user workstation."
+  },
+  {
+    "id": "laptop",
+    "name": "Laptop",
+    "role": "user-endpoint",
+    "layer": "access",
+    "supports": ["mobile-access", "wireless"],
+    "connections": ["wireless", "ethernet"],
+    "notes": "Portable end-user device with flexible connectivity."
+  },
+  {
+    "id": "access-point",
+    "name": "Access Point",
+    "role": "wireless-access",
+    "layer": "access",
+    "supports": ["wireless", "roaming"],
+    "connections": ["ethernet", "wireless"],
+    "notes": "Extends connectivity to wireless clients and usually connects to a switch or router."
+  },
+  {
+    "id": "cloud",
+    "name": "Internet Cloud",
+    "role": "external-service",
+    "layer": "edge",
+    "supports": ["internet", "remote-access"],
+    "connections": ["fiber", "wireless"],
+    "notes": "Represents external connectivity and internet-facing services."
+  }
+]

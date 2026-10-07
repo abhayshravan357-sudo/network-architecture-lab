@@ -1,0 +1,47 @@
+[
+  {
+    "id": "vlan",
+    "title": "VLAN",
+    "what": "Logical segmentation of a network using a broadcast domain boundary.",
+    "why": "To keep traffic separated without physically splitting the network infrastructure.",
+    "when": "When departments or user groups require logical isolation.",
+    "example": "Finance and HR networks on the same switch but isolated at Layer 2.",
+    "scenarioApplication": "A campus or office with multiple departments and different access rules."
+  },
+  {
+    "id": "inter-vlan-routing",
+    "title": "Inter-VLAN Routing",
+    "what": "Traffic forwarding between VLANs using a router or Layer 3 switch.",
+    "why": "To allow controlled communication between segments while preserving isolation.",
+    "when": "When separate VLANs need a controlled path to a common service or internet access.",
+    "example": "A student VLAN reaches the internet via a router or L3 switch.",
+    "scenarioApplication": "Campus or multi-tenant environment with segmentation and routed access."
+  },
+  {
+    "id": "dhcp",
+    "title": "DHCP",
+    "what": "Automatic IP assignment to endpoints.",
+    "why": "To reduce manual configuration and support dynamic endpoint growth.",
+    "when": "When many devices need IPs without static assignment.",
+    "example": "Wireless clients receive an IP from a DHCP server.",
+    "scenarioApplication": "A college dorm or office with many transient devices."
+  },
+  {
+    "id": "dns",
+    "title": "DNS",
+    "what": "Name resolution service for human-friendly addresses.",
+    "why": "To map names to IP addresses for service access.",
+    "when": "When users need to access services by name or user-friendly endpoints.",
+    "example": "web.internal and mail.company.local.",
+    "scenarioApplication": "Campus intranet or enterprise application access."
+  },
+  {
+    "id": "acl",
+    "title": "ACL",
+    "what": "Access control list that permits or denies traffic.",
+    "why": "To enforce security and policy between segments.",
+    "when": "When trust boundaries or sensitive services require selective access.",
+    "example": "Only administrators can reach network management VLAN.",
+    "scenarioApplication": "Hospital, campus, or branch networks with role-based controls."
+  }
+]

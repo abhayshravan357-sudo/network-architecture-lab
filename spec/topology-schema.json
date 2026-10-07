@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TopologyDefinition",
+  "description": "The complete runtime topology: devices and links as built by the student in the Lab view.",
+  "type": "object",
+  "required": ["id", "name", "devices", "links"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "devices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string", "description": "Device type id from src/data/devices, e.g. pc, switch" },
+          "name": { "type": "string" },
+          "ip": { "type": "string", "description": "IPv4 address or empty string for L2 devices" },
+          "mask": { "type": "string", "description": "Subnet mask, e.g. 255.255.255.0" },
+          "gateway": { "type": "string", "description": "Default gateway or empty string" },
+          "x": { "type": "number", "description": "Canvas position (React Flow coordinates)" },
+          "y": { "type": "number", "description": "Canvas position (React Flow coordinates)" }
+        }
+      }
+    },
+    "links": { "$ref": "link-schema.json" }
+  }
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "deployment",
+    "title": "Deployment",
+    "what": "Placing and starting services in the right environment.",
+    "why": "To ensure each workload lands on suitable infrastructure with access to resources.",
+    "when": "When launching a new VNF or service chain.",
+    "example": "A vFirewall is instantiated near the east-west traffic boundary.",
+    "scenarioApplication": "Scaling a service or adding security enforcement."
+  },
+  {
+    "id": "scaling",
+    "title": "Scaling",
+    "what": "Adjusting capacity to match demand.",
+    "why": "To maintain service quality under usage changes.",
+    "when": "When traffic, users, or workloads increase or decrease.",
+    "example": "A vLoadBalancer instance adds capacity during peak traffic.",
+    "scenarioApplication": "User growth, service spikes, or failover events."
+  },
+  {
+    "id": "migration",
+    "title": "Migration",
+    "what": "Moving a VNF or service to another resource location.",
+    "why": "To restore service health or optimize utilization.",
+    "when": "When a node fails or a resource becomes overloaded.",
+    "example": "A security function moves to a healthy compute node.",
+    "scenarioApplication": "Failures, maintenance windows, or balancing workloads."
+  }
+]

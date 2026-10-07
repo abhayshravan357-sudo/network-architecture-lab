@@ -1,0 +1,31 @@
+{
+  "id": "hotel",
+  "title": "Hotel",
+  "story": "A hotel must support guest Wi-Fi, room services, back-office systems, and vendor access while controlling costs and keeping management traffic separate.",
+  "users": ["guests", "staff", "vendors", "administration"],
+  "departments": ["guest services", "operations", "IT", "guest network"],
+  "locations": ["guest rooms", "lobby", "back office", "internet edge"],
+  "requirements": {
+    "segmentation": "required",
+    "internet": "required",
+    "wireless": "required",
+    "centralizedServices": "required",
+    "availability": "moderate"
+  },
+  "concepts": {
+    "guest-isolation": "required",
+    "VLAN": "highly-relevant",
+    "DHCP": "relevant",
+    "ACL": "relevant",
+    "wireless access": "required"
+  },
+  "protocols": ["DHCP", "VLAN", "ACL", "NAT"],
+  "validationRules": [
+    "Guest traffic must remain distinct from staff and management networks.",
+    "The design should support numerous mobile endpoints.",
+    "Back-office systems and room service services should remain isolated from public access."
+  ],
+  "sdnFocus": ["policy segmentation", "centralized user policy"],
+  "nfvFocus": ["vFirewall", "vLoadBalancer"],
+  "simulationEvents": ["traffic-surge", "security-event"]
+}

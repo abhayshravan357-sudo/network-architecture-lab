@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScenarioDefinition",
+  "type": "object",
+  "required": ["id", "title", "story", "requirements", "concepts", "validationRules"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "story": { "type": "string" },
+    "users": { "type": "array", "items": { "type": "string" } },
+    "departments": { "type": "array", "items": { "type": "string" } },
+    "locations": { "type": "array", "items": { "type": "string" } },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "segmentation": { "type": "string" },
+        "internet": { "type": "string" },
+        "wireless": { "type": "string" },
+        "centralizedServices": { "type": "string" },
+        "availability": { "type": "string" }
+      }
+    },
+    "concepts": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "validationRules": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

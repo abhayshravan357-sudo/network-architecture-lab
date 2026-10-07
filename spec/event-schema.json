@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SimulationEvent",
+  "type": "object",
+  "required": ["id", "name", "trigger", "affects", "response"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "trigger": { "type": "string" },
+    "affects": { "type": "array", "items": { "type": "string" } },
+    "response": { "type": "string" }
+  }
+}

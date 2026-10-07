@@ -1,0 +1,29 @@
+[
+  {
+    "id": "controller",
+    "name": "SDN Controller",
+    "role": "control-plane",
+    "layer": "controller",
+    "supports": ["flow-management", "centralized-policy", "northbound-api"],
+    "connections": ["southbound-interface"],
+    "notes": "Centralizes decision logic and pushes forwarding policies to the data plane."
+  },
+  {
+    "id": "vrouter",
+    "name": "vRouter",
+    "role": "virtual-routing",
+    "layer": "virtual-network",
+    "supports": ["routing", "to-vnf"],
+    "connections": ["virtual-link"],
+    "notes": "Routing function instantiated as a virtual network function."
+  },
+  {
+    "id": "vfirewall",
+    "name": "vFirewall",
+    "role": "virtual-security",
+    "layer": "virtual-network",
+    "supports": ["ACL", "segmentation"],
+    "connections": ["virtual-link"],
+    "notes": "Software-based firewall deployed in an NFV environment."
+  }
+]

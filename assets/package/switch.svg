@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Switch icon">
+  <rect x="18" y="26" width="92" height="76" rx="12" fill="#0f766e"/>
+  <rect x="34" y="42" width="60" height="40" rx="8" fill="#ccfbf1" opacity="0.2"/>
+  <path d="M44 60h40M52 48v24M76 48v24" stroke="#ecfeff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M32 108h64" stroke="#99f6e4" stroke-width="8" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QuizQuestion",
+  "type": "object",
+  "required": ["id", "prompt", "options", "answerKey", "reasoning"],
+  "properties": {
+    "id": { "type": "string" },
+    "prompt": { "type": "string" },
+    "options": { "type": "array", "items": { "type": "string" } },
+    "answerKey": { "type": "string" },
+    "reasoning": { "type": "string" }
+  }
+}

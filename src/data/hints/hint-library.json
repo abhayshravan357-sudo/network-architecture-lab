@@ -1,0 +1,22 @@
+[
+  {
+    "id": "hint-1",
+    "level": 1,
+    "text": "Think about the requirement that is most strict in the scenario."
+  },
+  {
+    "id": "hint-2",
+    "level": 2,
+    "text": "Consider how traffic should be isolated or routed between groups."
+  },
+  {
+    "id": "hint-3",
+    "level": 3,
+    "text": "Which technology historically separates user groups without building separate physical networks?"
+  },
+  {
+    "id": "hint-4",
+    "level": 4,
+    "text": "A VLAN is a likely answer, but check whether the design also needs inter-VLAN routing or ACLs."
+  }
+]

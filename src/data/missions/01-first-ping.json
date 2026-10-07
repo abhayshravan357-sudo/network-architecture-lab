@@ -1,0 +1,11 @@
+{
+  "id": "first-ping",
+  "title": "First Ping",
+  "description": "Connect two PCs through a switch and successfully ping from PC1 to PC2.",
+  "expected": {
+    "deviceTypes": ["pc", "pc", "switch"],
+    "links": 2,
+    "sameSubnet": true
+  },
+  "rewardXp": 100
+}

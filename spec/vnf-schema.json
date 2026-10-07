@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VNFDefinition",
+  "type": "object",
+  "required": ["id", "name", "category", "cpu", "memory", "throughput", "lifecycle"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "category": { "type": "string" },
+    "cpu": { "type": "number" },
+    "memory": { "type": "number" },
+    "throughput": { "type": "number" },
+    "lifecycle": { "type": "array", "items": { "type": "string" } }
+  }
+}

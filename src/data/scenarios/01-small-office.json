@@ -1,0 +1,31 @@
+{
+  "id": "small-office",
+  "title": "Small Office",
+  "story": "A growing office needs reliable internet, secure local services, and a clean separation between staff and guest traffic without a complicated topology.",
+  "users": ["employees", "guests", "administration"],
+  "departments": ["administration", "engineering", "guests"],
+  "locations": ["main office", "conference room", "internet edge"],
+  "requirements": {
+    "segmentation": "required",
+    "internet": "required",
+    "wireless": "required",
+    "centralizedServices": "required",
+    "availability": "moderate"
+  },
+  "concepts": {
+    "VLAN": "highly-relevant",
+    "inter-VLAN routing": "highly-relevant",
+    "NAT": "relevant",
+    "DHCP": "relevant",
+    "ACL": "relevant"
+  },
+  "protocols": ["DHCP", "NAT", "VLAN", "ACL"],
+  "validationRules": [
+    "Guest access must not reach internal services directly.",
+    "A path to the internet should exist.",
+    "The design should support dynamic endpoint assignment."
+  ],
+  "sdnFocus": ["centralized policy", "flow awareness"],
+  "nfvFocus": ["vFirewall", "vRouter"],
+  "simulationEvents": ["traffic-surge"]
+}

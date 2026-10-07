@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RuntimeEventDefinition",
+  "description": "A runtime simulation event emitted by the engine at each hop of a packet. This is distinct from the knowledge-level spec/event-schema.json, which describes educational event concepts (trigger/affects/response).",
+  "type": "object",
+  "required": ["id", "packetId", "deviceId", "action", "timestamp", "detail"],
+  "properties": {
+    "id": { "type": "string" },
+    "packetId": { "type": "string", "description": "Id of the packet this event belongs to" },
+    "deviceId": { "type": "string", "description": "Device where the event occurred" },
+    "action": {
+      "type": "string",
+      "enum": ["transmit", "broadcast", "flood", "receive", "reply", "drop"]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "detail": { "type": "string" },
+    "packetType": {
+      "type": "string",
+      "enum": ["arp-request", "arp-reply", "icmp-echo", "icmp-reply"]
+    }
+  }
+}

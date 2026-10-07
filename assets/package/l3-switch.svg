@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="L3 switch icon">
+  <rect x="18" y="24" width="92" height="80" rx="12" fill="#7c3aed"/>
+  <path d="M38 52h52M52 38v28M76 38v28" stroke="#f5f3ff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M32 108h64" stroke="#ddd6fe" stroke-width="8" stroke-linecap="round"/>
+</svg>

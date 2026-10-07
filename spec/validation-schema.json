@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ValidationDefinition",
+  "type": "object",
+  "required": ["category", "description", "logic"],
+  "properties": {
+    "category": { "type": "string" },
+    "description": { "type": "string" },
+    "logic": { "type": "string" },
+    "severity": { "type": "string", "enum": ["low", "medium", "high"] }
+  }
+}

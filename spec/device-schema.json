@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeviceDefinition",
+  "type": "object",
+  "required": ["id", "name", "role", "layer", "supports", "connections"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "role": { "type": "string" },
+    "layer": { "type": "string" },
+    "supports": { "type": "array", "items": { "type": "string" } },
+    "connections": { "type": "array", "items": { "type": "string" } },
+    "notes": { "type": "string" }
+  }
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "nfv",
+    "title": "NFV",
+    "what": "Network function virtualization where routers, firewalls, and load balancers run as software functions.",
+    "why": "To reduce hardware dependence, increase flexibility, and improve scaling.",
+    "when": "When network services must scale dynamically and move between resources.",
+    "example": "A firewall instance deployed in a virtual environment instead of a dedicated appliance.",
+    "scenarioApplication": "Cloud-style or service-oriented network deployments."
+  },
+  {
+    "id": "vnf",
+    "title": "VNF",
+    "what": "A virtualized network function.",
+    "why": "To run network features in software on a shared resource pool.",
+    "when": "When service functions need placement, failover, or elastic scaling.",
+    "example": "vFirewall, vRouter, vLoadBalancer.",
+    "scenarioApplication": "Multi-service networks and dynamic demand."
+  },
+  {
+    "id": "service-chain",
+    "title": "Service Chain",
+    "what": "An ordered sequence of VNFs that traffic passes through.",
+    "why": "To enforce security, optimization, and processing steps in a repeatable way.",
+    "when": "When multiple network services must be applied in sequence.",
+    "example": "Traffic passes through a vFirewall then a vLoadBalancer and then a vIDS.",
+    "scenarioApplication": "Modern enterprise and cloud-native infrastructures."
+  }
+]

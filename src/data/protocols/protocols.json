@@ -1,0 +1,47 @@
+[
+  {
+    "name": "DHCP",
+    "layer": "application",
+    "purpose": "Assign addresses automatically.",
+    "whereUsed": ["wireless networks", "campus user segments"],
+    "requirements": ["DHCP server"],
+    "prerequisites": ["IP subnet"],
+    "commonScenarios": ["office", "campus"]
+  },
+  {
+    "name": "DNS",
+    "layer": "application",
+    "purpose": "Resolve names to IP addresses.",
+    "whereUsed": ["internal services", "internet access"],
+    "requirements": ["DNS server"],
+    "prerequisites": ["routing"],
+    "commonScenarios": ["enterprise", "campus"]
+  },
+  {
+    "name": "VLAN",
+    "layer": "data-link",
+    "purpose": "Segment traffic logically.",
+    "whereUsed": ["switch ports", "departmental separation"],
+    "requirements": ["switch support"],
+    "prerequisites": ["switching"],
+    "commonScenarios": ["campus", "office"]
+  },
+  {
+    "name": "OSPF",
+    "layer": "network",
+    "purpose": "Dynamic routing within an internal network.",
+    "whereUsed": ["enterprise routing", "branch connectivity"],
+    "requirements": ["router or L3 switch"],
+    "prerequisites": ["IP addressing"],
+    "commonScenarios": ["multi-branch"]
+  },
+  {
+    "name": "NAT",
+    "layer": "network",
+    "purpose": "Translate private addresses to public or shared addresses.",
+    "whereUsed": ["internet egress", "shared access"],
+    "requirements": ["router or firewall"],
+    "prerequisites": ["addressing plan"],
+    "commonScenarios": ["small office", "campus"]
+  }
+]

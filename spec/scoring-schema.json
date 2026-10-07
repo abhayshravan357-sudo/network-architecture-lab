@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScoringDefinition",
+  "type": "object",
+  "required": ["category", "weight", "description"],
+  "properties": {
+    "category": { "type": "string" },
+    "weight": { "type": "number", "minimum": 0, "maximum": 100 },
+    "description": { "type": "string" }
+  }
+}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="PC icon">
+  <rect x="24" y="22" width="80" height="60" rx="8" fill="#0f172a"/>
+  <rect x="32" y="30" width="64" height="44" rx="6" fill="#e2e8f0" opacity="0.2"/>
+  <path d="M40 100h48M54 82v18M74 82v18" stroke="#e2e8f0" stroke-width="6" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,31 @@
+{
+  "id": "multi-branch-enterprise",
+  "title": "Multi-Branch Enterprise",
+  "story": "A company with headquarters, regional branches, and cloud services needs secure connectivity, reliable routing, and failover across geographically distributed sites.",
+  "users": ["head office", "branch staff", "remote workers", "partners"],
+  "departments": ["finance", "sales", "operations", "support"],
+  "locations": ["headquarters", "branch a", "branch b", "cloud edge"],
+  "requirements": {
+    "segmentation": "required",
+    "internet": "required",
+    "wireless": "optional",
+    "centralizedServices": "required",
+    "availability": "high"
+  },
+  "concepts": {
+    "routing": "highly-relevant",
+    "redundancy": "highly-relevant",
+    "OSPF": "highly-relevant",
+    "firewall": "required",
+    "VPN": "relevant"
+  },
+  "protocols": ["OSPF", "ACL", "VLAN", "NAT"],
+  "validationRules": [
+    "Branch connectivity should be resilient and routed correctly.",
+    "Different business units should be separated where required.",
+    "The architecture should support failover and central management."
+  ],
+  "sdnFocus": ["path optimization", "centralized policy"],
+  "nfvFocus": ["vRouter", "vFirewall", "vLoadBalancer"],
+  "simulationEvents": ["link-failure", "resource-shortage"]
+}

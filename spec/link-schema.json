@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LinkDefinition",
+  "description": "A physical/logical Ethernet connection between two device ports in the runtime topology.",
+  "type": "object",
+  "required": ["id", "source", "target", "type", "status"],
+  "properties": {
+    "id": { "type": "string" },
+    "source": {
+      "type": "object",
+      "required": ["deviceId", "port"],
+      "properties": {
+        "deviceId": { "type": "string" },
+        "port": { "type": "string" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["deviceId", "port"],
+      "properties": {
+        "deviceId": { "type": "string" },
+        "port": { "type": "string" }
+      }
+    },
+    "type": { "type": "string", "enum": ["ethernet", "fiber", "wireless"] },
+    "status": { "type": "string", "enum": ["up", "down"] }
+  }
+}
