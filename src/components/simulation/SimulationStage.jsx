@@ -3,11 +3,10 @@ import { useGameStore, STAGES } from '../../state/gameStore.js';
 import { getScenario } from '../../data/scenarios/index.js';
 import { applyEvent, scoreSimulation } from '../../engine/simulation/simulationEngine.js';
 import { computeReroute } from '../../engine/sdn/sdnEngine.js';
-import { scaleInstance } from '../../engine/orchestration/orchestratorEngine.js';
+import { scaleInstance, applyLoad } from '../../engine/orchestration/orchestratorEngine.js';
 import { DEVICE_CATALOG_MAP } from '../../data/devices/deviceCatalog.js';
-import { simulationAssets } from '../../assets/assetMap.js';
+import { simulationAssets, uiAssets } from '../../assets/assetMap.js';
 
-/** Map a scenario event id to the simulation engine's event vocabulary. */
 function mapEventToEngine(eventId) {
   const id = eventId.toLowerCase();
   if (id.includes('traffic') || id.includes('surge') || id.includes('occupancy')) return 'traffic-surge';
@@ -19,10 +18,66 @@ function mapEventToEngine(eventId) {
   return 'traffic-surge';
 }
 
-/**
- * Simulation Stage — run dynamic events against the
- * architecture and respond to them.
- */
+function computeMetrics(recorded, instances) {
+  const events = recorded ?? [];
+  if (events.length === 0) {
+    return { latency: 25, packetLoss: 0.5, throughput: 85, availability: 99.9 };
+  }
+
+  let latency = 25;
+  let packetLoss = 0.5;
+  let throughput = 85;
+  let availability = 99.9;
+
+  for (const event of events) {
+    if (event.eventId === 'traffic-surge') {
+      latency += 35;
+      packetLoss += 4.5;
+      throughput -= 18;
+      availability -= 0.8;
+    } else if (event.eventId === 'link-failure' || event.eventId === 'node-failure') {
+      latency += 20;
+      packetLoss += 2;
+      throughput -= 12;
+      availability -= 2.5;
+    } else if (event.eventId === 'security-event') {
+      latency += 5;
+      packetLoss += 0.2;
+      throughput -= 2;
+      availability -= 0.1;
+    } else if (event.eventId === 'resource-shortage') {
+      latency += 15;
+      packetLoss += 1.5;
+      throughput -= 8;
+      availability -= 0.5;
+    }
+
+    if (event.resolved) {
+      if (event.responseKind === 'reroute' || event.responseKind === 'failover') {
+        latency -= 15;
+        throughput += 6;
+        availability += 1.2;
+      } else if (event.responseKind === 'scale') {
+        latency -= 20;
+        packetLoss -= 3;
+        throughput += 10;
+        availability += 0.6;
+      } else if (event.responseKind === 'acl-verified') {
+        latency -= 3;
+        packetLoss -= 0.1;
+        throughput += 1;
+      }
+    }
+  }
+
+  return {
+    latency: Math.max(5, Math.round(latency * 10) / 10),
+    packetLoss: Math.max(0, Math.round(packetLoss * 100) / 100),
+    throughput: Math.max(10, Math.min(100, Math.round(throughput))),
+    availability: Math.max(90, Math.round(availability * 10) / 10),
+  };
+}
+
 export default function SimulationStage() {
   const graph = useGameStore((s) => s.network.graph);
   const orchestrationState = useGameStore((s) => s.orchestrationState);
@@ -55,6 +110,7 @@ export default function SimulationStage() {
   );
 
   const score = useMemo(() => scoreSimulation(recorded), [recorded]);
+  const metrics = useMemo(() => computeMetrics(recorded, vnfInstances), [recorded, vnfInstances]);
 
   if (nodes.length === 0) {
     return (
@@ -116,11 +172,6 @@ export default function SimulationStage() {
     setSimulationGraph(result.graphAfter);
   };
 
-  // ── Student responses ──────────────────────────────────
-  // A failure response only resolves the event when the
-  // post-event graph still provides endpoint→server reachability
-  // (i.e. the controller actually found an alternate path).
-
   const graphHasConnectivity = (afterGraph) => {
     const endpoints = (afterGraph.nodes ?? []).filter((n) =>
       ['pc', 'laptop'].includes(n.type)
@@ -150,8 +201,9 @@ export default function SimulationStage() {
       return;
     }
     const scaled = vnfInstances.map((i) => scaleInstance(i));
-    scaled.forEach(updateInstance);
-    const stillOverloaded = scaled.some((i) => (i.load ?? 0) > i.throughput);
+    const applied = applyLoad(scaled, Math.max(0, load - 800));
+    applied.forEach(updateInstance);
+    const stillOverloaded = applied.some((i) => (i.load ?? 0) > i.throughput);
     resolveSimulationEvent(
       record.recordId,
       stillOverloaded ? 'scale-insufficient' : 'scale'
@@ -170,13 +222,13 @@ export default function SimulationStage() {
 
   const responseFor = (record) => {
     if (record.eventId === 'link-failure' || record.eventId === 'node-failure') {
-      return { label: '⚡ Reroute via SDN controller', fn: () => handleRerouteResponse(record) };
+      return { icon: uiAssets.bolt, label: 'Reroute via SDN controller', fn: () => handleRerouteResponse(record) };
     }
     if (['traffic-surge', 'user-growth', 'resource-shortage'].includes(record.eventId)) {
-      return { label: '📈 Scale VNFs', fn: () => handleScaleResponse(record) };
+      return { icon: uiAssets.chart, label: 'Scale VNFs', fn: () => handleScaleResponse(record) };
     }
     if (record.eventId === 'security-event') {
-      return { label: '🔒 Verify segmentation & ACLs', fn: () => handleSecurityResponse(record) };
+      return { icon: uiAssets.shield, label: 'Verify segmentation & ACLs', fn: () => handleSecurityResponse(record) };
     }
     return null;
   };
@@ -257,6 +309,27 @@ export default function SimulationStage() {
               </select>
             </div>
           </div>
+
+          {/* Deterministic metrics */}
+          <div className="panel" style={{ padding: 20 }}>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>Live Metrics</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { label: 'Latency', value: `${metrics.latency} ms`, color: metrics.latency > 50 ? 'var(--c-warning)' : 'var(--c-text)' },
+                { label: 'Packet loss', value: `${metrics.packetLoss}%`, color: metrics.packetLoss > 2 ? 'var(--c-danger)' : 'var(--c-text)' },
+                { label: 'Throughput', value: `${metrics.throughput}%`, color: metrics.throughput < 60 ? 'var(--c-warning)' : 'var(--c-success)' },
+                { label: 'Availability', value: `${metrics.availability}%`, color: metrics.availability < 98 ? 'var(--c-warning)' : 'var(--c-success)' },
+              ].map((m) => (
+                <div key={m.label} style={{ border: '1px solid var(--c-border)', borderRadius: 10, padding: 10, background: 'var(--c-bg-elevated)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--c-text-dim)', marginBottom: 4 }}>{m.label}</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'monospace', color: m.color }}>{m.value}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ color: 'var(--c-text-dim)', fontSize: '0.78rem', marginTop: 10 }}>
+              Metrics are deterministic: they change based on event history and responses, not random values.
+            </p>
+          </div>
         </div>
 
         {/* Event log + responses */}
@@ -271,6 +344,7 @@ export default function SimulationStage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto' }}>
                 {[...recorded].reverse().map((record, i) => {
                   const response = record.resolved ? null : responseFor(record);
+                  const time = new Date(record.timestamp).toLocaleTimeString();
                   return (
                     <div
                       key={`${record.timestamp}-${i}`}
@@ -293,15 +367,18 @@ export default function SimulationStage() {
                           )}
                           {record.label}
                         </span>
-                        <span
-                          className="badge"
-                          style={{
-                            fontSize: '0.62rem',
-                            background: record.impact === 'critical' || record.impact === 'high' ? 'var(--c-danger-bg)' : 'var(--c-bg-deep)',
-                            color: record.impact === 'critical' || record.impact === 'high' ? 'var(--c-danger)' : 'var(--c-text-dim)',
-                          }}
-                        >
-                          {record.impact.toUpperCase()}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--c-text-dim)', fontFamily: 'monospace' }}>{time}</span>
+                          <span
+                            className="badge"
+                            style={{
+                              fontSize: '0.62rem',
+                              background: record.impact === 'critical' || record.impact === 'high' ? 'var(--c-danger-bg)' : 'var(--c-bg-deep)',
+                              color: record.impact === 'critical' || record.impact === 'high' ? 'var(--c-danger)' : 'var(--c-text-dim)',
+                            }}
+                          >
+                            {record.impact.toUpperCase()}
+                          </span>
                         </span>
                       </div>
                       <div style={{ fontSize: '0.84rem', color: 'var(--c-text-muted)' }}>{record.summary}</div>
@@ -322,6 +399,9 @@ export default function SimulationStage() {
                           </span>
                         ) : response ? (
                           <button className="btn btn-accent btn-sm" onClick={response.fn}>
+                            {response.icon && (
+                              <img src={response.icon} alt="" style={{ width: '0.9rem', height: '0.9rem', marginRight: 6, verticalAlign: '-0.1rem' }} />
+                            )}
                             {response.label}
                           </button>
                         ) : (
@@ -358,7 +438,6 @@ export default function SimulationStage() {
   );
 }
 
-/** BFS path existence — small local helper for response checks. */
 function computePathExists(graphData, fromId, toId) {
   const neighbors = new Map();
   for (const n of graphData.nodes ?? []) neighbors.set(n.id, []);

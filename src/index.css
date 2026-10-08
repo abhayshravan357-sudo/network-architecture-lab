@@ -1317,6 +1317,31 @@ hr, .divider {
 .device-node-ip { font-size: 0.62rem; color: var(--c-accent-soft); font-family: 'JetBrains Mono', monospace; }
 .device-node-vlan { font-size: 0.6rem; color: var(--c-text-dim); }
 
+.device-node-interfaces {
+  margin-top: 4px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.device-node-iface {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.58rem;
+  color: var(--c-text-dim);
+  font-family: 'JetBrains Mono', monospace;
+}
+.device-node-iface-name { color: var(--c-text-muted); }
+.device-node-iface-status { color: var(--c-success); }
+.device-node-iface-status--down { color: var(--c-danger); }
+.device-node-iface-more {
+  font-size: 0.58rem;
+  color: var(--c-text-dim);
+  font-style: italic;
+  text-align: right;
+}
+
 .device-node-type-badge {
   font-size: 0.55rem;
   font-weight: 700;
@@ -1335,6 +1360,52 @@ hr, .divider {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+.config-panel-tabs {
+  display: flex;
+  gap: 6px;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.config-panel-tab {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text-dim);
+  background: var(--c-bg-glass);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.config-panel-tab:hover:not(:disabled) {
+  color: var(--c-text-muted);
+  border-color: var(--c-border);
+}
+
+.config-panel-tab.active {
+  color: var(--c-accent-soft);
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(125, 211, 252, 0.35);
+}
+
+.config-panel-tab:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.config-panel-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .config-panel-empty {

@@ -1,6 +1,8 @@
 import React, { Suspense, lazy } from 'react';
 import { useGameStore, STAGES, STAGE_ORDER, STAGE_LABELS } from './state/gameStore.js';
 import { uiAssets } from './assets/assetMap.js';
+import ProgressBar from './components/ui/ProgressBar.jsx';
+import NetworkStatus from './components/ui/NetworkStatus.jsx';
 import './index.css';
 
 // ── Lazy-loaded stage components ───────────────────────────────────────────
@@ -157,6 +159,8 @@ export default function App() {
   return (
     <div className="app-shell">
       <TopNav />
+      <ProgressBar />
+      <NetworkStatus />
       <StageRouter />
     </div>
   );

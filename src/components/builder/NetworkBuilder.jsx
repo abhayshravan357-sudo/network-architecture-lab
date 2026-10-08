@@ -15,6 +15,7 @@ import { getScenario } from '../../data/scenarios/index.js';
 import { getDeviceDef } from '../../data/devices/deviceCatalog.js';
 import { deviceAssets } from '../../assets/assetMap.js';
 import DeviceNode from './DeviceNode.jsx';
+import DeviceConsole from './DeviceConsole.jsx';
 
 // ── Palette Component ────────────────────────────────────────────────────────
 function BuilderPalette({ resourcePool, nodeCounts }) {
@@ -36,7 +37,7 @@ function BuilderPalette({ resourcePool, nodeCounts }) {
         const depleted = remaining <= 0;
 
         return (
-          <div 
+          <div
             key={type}
             className={`palette-item ${depleted ? 'depleted' : ''}`}
             onDragStart={(event) => !depleted && onDragStart(event, type)}
@@ -101,16 +102,42 @@ function ConfigPanel({ selectedNode, updateNodeData }) {
     updateNodeData(selectedNode.id, { vlans });
   };
 
+  // Router interface handlers
+  const isRouter = data.type === 'router';
+  const interfaces = data.interfaces || [];
+
+  const handleInterfaceAdd = (e) => {
+    if (e.key === 'Enter' && e.target.value.trim()) {
+      const parts = e.target.value.trim().split('/');
+      const ip = parts[0].trim();
+      const mask = parts[1] ? parseInt(parts[1], 10) : 24;
+      if (isValidIp(ip) && !isNaN(mask) && mask >= 8 && mask <= 30) {
+        updateNodeData(selectedNode.id, {
+          interfaces: [...interfaces, { ip, mask, name: `G${interfaces.length}` }],
+        });
+      }
+      e.target.value = '';
+    }
+  };
+
+  const handleInterfaceRemove = (idx) => {
+    updateNodeData(selectedNode.id, {
+      interfaces: interfaces.filter((_, i) => i !== idx),
+    });
+  };
+
+  const isValidIp = (ip) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip) && ip.split('.').every(o => o <= 255);
+
   return (
     <aside className="config-panel">
       <div className="config-section">
         <div className="config-section-title">Identity</div>
         <div className="field">
           <label className="field-label">Device Name</label>
-          <input 
-            type="text" 
-            name="label" 
-            value={data.label || ''} 
+          <input
+            type="text"
+            name="label"
+            value={data.label || ''}
             onChange={handleChange}
             placeholder={`e.g. Core-${def?.name}`}
           />
@@ -121,10 +148,10 @@ function ConfigPanel({ selectedNode, updateNodeData }) {
         <div className="config-section-title">Network</div>
         <div className="field" style={{ marginBottom: '12px' }}>
           <label className="field-label">IP Address (optional)</label>
-          <input 
-            type="text" 
-            name="ip" 
-            value={data.ip || ''} 
+          <input
+            type="text"
+            name="ip"
+            value={data.ip || ''}
             onChange={handleChange}
             placeholder="192.168.1.1"
           />
@@ -143,14 +170,40 @@ function ConfigPanel({ selectedNode, updateNodeData }) {
               <span style={{ fontSize: '0.75rem', color: 'var(--c-text-dim)' }}>None configured</span>
             )}
           </div>
-          <input 
-            type="number" 
-            placeholder="Type VLAN ID and press Enter..." 
+          <input
+            type="number"
+            placeholder="Type VLAN ID and press Enter..."
             onKeyDown={handleVlanAdd}
             style={{ fontSize: '0.8rem' }}
           />
         </div>
       </div>
+
+      {isRouter && (
+        <div className="config-section">
+          <div className="config-section-title">Router Interfaces</div>
+          <div className="field" style={{ marginBottom: '12px' }}>
+            <label className="field-label">Interface (IP/mask)</label>
+            <input
+              type="text"
+              placeholder="e.g. 192.168.1.1/24 or 10.0.0.1/24"
+              onKeyDown={handleInterfaceAdd}
+              style={{ fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace' }}
+            />
+          </div>
+          <div className="chip-row" style={{ marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+            {interfaces.length === 0 && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--c-text-dim)' }}>No interfaces configured</span>
+            )}
+            {interfaces.map((iface, idx) => (
+              <span key={idx} className="vlan-tag" style={{ background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.4)' }}>
+                {iface.name}: {iface.ip}/{iface.mask}
+                <span className="remove" onClick={() => handleInterfaceRemove(idx)}>✕</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
@@ -158,24 +211,18 @@ function ConfigPanel({ selectedNode, updateNodeData }) {
 // ── Main Network Builder Component ───────────────────────────────────────────
 export default function NetworkBuilder() {
   const reactFlowWrapper = useRef(null);
-  
+
   const activeScenarioId = useGameStore((s) => s.activeScenarioId);
   const goToStage = useGameStore((s) => s.goToStage);
   const setRFNodes = useGameStore((s) => s.setRFNodes);
   const setRFEdges = useGameStore((s) => s.setRFEdges);
   const setNetworkGraph = useGameStore((s) => s.setNetworkGraph);
 
-  // The zustand store is the single source of truth for the canvas.
-  // Every edit (drop, delete, connect, move, relabel) writes straight
-  // through to the store, so the builder survives navigation and
-  // later stages always see the live architecture.
   const nodes = useGameStore((s) => s.network.rfNodes);
   const edges = useGameStore((s) => s.network.rfEdges);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
-  // The `fitView` prop cannot be used here: with an empty canvas it
-  // fires when the FIRST dropped node is measured and zooms to
-  // maxZoom to fit a single device. Instead, fit once on mount only
-  // when a saved topology is being restored.
+  const [activeRightTab, setActiveRightTab] = useState('config');
+  const [consoleNodeId, setConsoleNodeId] = useState(null);
   const hasFittedView = useRef(false);
 
   useEffect(() => {
@@ -194,7 +241,6 @@ export default function NetworkBuilder() {
 
   const nodeTypes = useMemo(() => ({ deviceNode: DeviceNode }), []);
 
-  // Compute used resources
   const nodeCounts = useMemo(() => {
     const counts = {};
     nodes.forEach(n => {
@@ -203,8 +249,6 @@ export default function NetworkBuilder() {
     return counts;
   }, [nodes]);
 
-  // Handlers — all derive the next state from the live store so no
-  // stale closures can overwrite concurrent edits.
   const onNodesChange = useCallback(
     (changes) =>
       setRFNodes(applyNodeChanges(changes, useGameStore.getState().network.rfNodes)),
@@ -231,6 +275,10 @@ export default function NetworkBuilder() {
     [setRFEdges]
   );
 
+  const onNodeClick = useCallback((_, node) => {
+    setActiveRightTab('config');
+  }, []);
+
   const onDragOver = useCallback((event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -247,14 +295,14 @@ export default function NetworkBuilder() {
         x: event.clientX,
         y: event.clientY,
       });
-      
+
       const newNodeId = `${type}-${Date.now()}`;
       const newNode = {
         id: newNodeId,
         type: 'deviceNode',
         position,
-        data: { 
-          type, 
+        data: {
+          type,
           label: `${def?.name} ${nodeCounts[type] ? nodeCounts[type] + 1 : 1}`,
           vlans: []
         },
@@ -276,10 +324,19 @@ export default function NetworkBuilder() {
   }, [setRFNodes]);
 
   const selectedNode = nodes.find(n => n.selected);
+  const consoleNode = consoleNodeId ? nodes.find(n => n.id === consoleNodeId) : null;
+
+  const openConsole = (nodeId) => {
+    setConsoleNodeId(nodeId);
+    setActiveRightTab('console');
+  };
+
+  const closeConsole = () => {
+    setConsoleNodeId(null);
+    setActiveRightTab('config');
+  };
 
   const handleValidate = () => {
-    // Derive the pure graph from the live canvas state for the
-    // validation engine and all downstream stages.
     const { rfNodes, rfEdges } = useGameStore.getState().network;
     setNetworkGraph({
       nodes: rfNodes.map((n) => ({
@@ -300,13 +357,11 @@ export default function NetworkBuilder() {
 
   return (
     <div className="builder-layout anim-fade-in">
-      {/* Left: Palette */}
-      <BuilderPalette 
-        resourcePool={scenario.resourcePool} 
-        nodeCounts={nodeCounts} 
+      <BuilderPalette
+        resourcePool={scenario.resourcePool}
+        nodeCounts={nodeCounts}
       />
 
-      {/* Center: Canvas */}
       <div className="builder-canvas" ref={reactFlowWrapper}>
         <ReactFlow
           nodes={nodes}
@@ -333,11 +388,47 @@ export default function NetworkBuilder() {
         </ReactFlow>
       </div>
 
-      {/* Right: Config Panel */}
-      <ConfigPanel 
-        selectedNode={selectedNode} 
-        updateNodeData={updateNodeData} 
-      />
+      {/* Right: Tabbed Panel */}
+      <aside className="config-panel">
+        <div className="config-panel-tabs">
+          <button
+            className={`config-panel-tab ${activeRightTab === 'config' ? 'active' : ''}`}
+            onClick={() => setActiveRightTab('config')}
+          >
+            Config
+          </button>
+          <button
+            className={`config-panel-tab ${activeRightTab === 'console' ? 'active' : ''}`}
+            onClick={() => {
+              if (selectedNode) {
+                setConsoleNodeId(selectedNode.id);
+                setActiveRightTab('console');
+              }
+            }}
+            disabled={!selectedNode}
+          >
+            Console
+          </button>
+        </div>
+
+        <div className="config-panel-content">
+          {activeRightTab === 'config' && (
+            <ConfigPanel selectedNode={selectedNode} updateNodeData={updateNodeData} />
+          )}
+          {activeRightTab === 'console' && consoleNode && (
+            <DeviceConsole
+              node={consoleNode}
+              onClose={closeConsole}
+              updateNodeData={updateNodeData}
+            />
+          )}
+          {activeRightTab === 'console' && !consoleNode && (
+            <div className="config-panel-empty">
+              Select a device on the canvas to open its console.
+            </div>
+          )}
+        </div>
+      </aside>
 
       {/* Bottom Footer Bar */}
       <div className="builder-footer">
@@ -348,15 +439,32 @@ export default function NetworkBuilder() {
           <div className="builder-stat">
             Links <span className="builder-stat-value">{edges.length}</span>
           </div>
+          {selectedNode && (
+            <div className="builder-stat" style={{ color: 'var(--c-accent-soft)' }}>
+              Selected: <span className="builder-stat-value">{selectedNode.data.label || selectedNode.data.type}</span>
+            </div>
+          )}
         </div>
-        
-        <button 
-          className="btn btn-primary"
-          onClick={handleValidate}
-          disabled={nodes.length === 0}
-        >
-          Validate Architecture →
-        </button>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {selectedNode?.data.type === 'router' && (selectedNode.data.interfaces?.length ?? 0) === 0 && (
+            <span style={{ fontSize: '0.78rem', color: 'var(--c-warning)' }}>
+              Router has no interfaces — use Config or Console to add IPs.
+            </span>
+          )}
+          {nodes.length > 0 && edges.length === 0 && (
+            <span style={{ fontSize: '0.78rem', color: 'var(--c-text-dim)' }}>
+              Connect devices to build paths.
+            </span>
+          )}
+          <button
+            className="btn btn-primary"
+            onClick={handleValidate}
+            disabled={nodes.length === 0}
+          >
+            Validate Architecture →
+          </button>
+        </div>
       </div>
     </div>
   );

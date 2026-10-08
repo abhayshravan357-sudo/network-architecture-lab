@@ -233,6 +233,120 @@ export class NetworkGraph {
     return false;
   }
 
+  // ── Routing / Subnet support ───────────────────────────────────────────────
+
+  /**
+   * Get the IP network (prefix) for an interface config.
+   * @returns {string | null} CIDR string like "192.168.1.0/24"
+   */
+  static ipToNetwork(ip, mask) {
+    const parts = ip.split('.').map(Number);
+    const maskBits = 32 - mask;
+    const maskValue = mask === 0 ? 0 : (~((1 << maskBits) - 1)) >>> 0;
+    const ipInt = (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3];
+    const netInt = ipInt & maskValue;
+    return `${(netInt >>> 24) & 255}.${(netInt >>> 16) & 255}.${(netInt >>> 8) & 255}.${netInt & 255}/${mask}`;
+  }
+
+  /**
+   * Get all router interfaces that have IP configs.
+   * @returns {Array<{ nodeId, interface, network }>}
+   */
+  getRouterInterfaces() {
+    const results = [];
+    for (const node of this._nodes.values()) {
+      if (node.type === 'router' && node.config?.interfaces) {
+        for (const iface of node.config.interfaces) {
+          if (iface.ip && iface.mask) {
+            results.push({
+              nodeId: node.id,
+              interface: iface,
+              network: NetworkGraph.ipToNetwork(iface.ip, iface.mask),
+            });
+          }
+        }
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Check if a node has an interface in the given CIDR network.
+   */
+  nodeHasNetwork(nodeId, networkCidr) {
+    const node = this._nodes.get(nodeId);
+    if (!node?.config?.interfaces) return false;
+    return node.config.interfaces.some((iface) => {
+      if (!iface.ip || !iface.mask) return false;
+      return NetworkGraph.ipToNetwork(iface.ip, iface.mask) === networkCidr;
+    });
+  }
+
+  /**
+   * Find a path between two nodes that respects Layer-3 routing.
+   * For endpoints in different subnets, the path MUST traverse a router
+   * that has interfaces in BOTH subnets.
+   * @returns {string[] | null} Node ID path, or null if no routed path exists.
+   */
+  findRoutedPath(startId, endId) {
+    // First check simple L2 connectivity
+    const l2Path = this.findPath(startId, endId);
+    if (!l2Path) return null;
+
+    const startNode = this._nodes.get(startId);
+    const endNode = this._nodes.get(endId);
+    if (!startNode || !endNode) return null;
+
+    // If both are endpoints (PC, server, etc.), check if they're in same subnet
+    // via a connected router, or need routing
+    const startNetworks = this.getNodeNetworks(startId);
+    const endNetworks = this.getNodeNetworks(endId);
+
+    // Same subnet = direct L2 connectivity is fine
+    const common = startNetworks.find((n) => endNetworks.includes(n));
+    if (common) return l2Path;
+
+    // Different subnets: need a router with interfaces in BOTH networks
+    const routerInterfaces = this.getRouterInterfaces();
+    for (const router of routerInterfaces) {
+      const hasStartNet = startNetworks.includes(router.network);
+      const hasEndNet = endNetworks.includes(router.network);
+      if (hasStartNet && hasEndNet) {
+        // Verify the router is actually on the L2 path
+        if (l2Path.includes(router.nodeId)) return l2Path;
+      }
+    }
+
+    // No suitable router found on the path
+    return null;
+  }
+
+  /**
+   * Get all networks (CIDR) a node belongs to.
+   * For endpoints: check connected router interfaces via L2 path.
+   * For routers: return their own interface networks.
+   */
+  getNodeNetworks(nodeId, visited = new Set()) {
+    const node = this._nodes.get(nodeId);
+    if (!node) return [];
+
+    if (visited.has(nodeId)) return [];
+    visited.add(nodeId);
+
+    if (node.type === 'router' && node.config?.interfaces) {
+      return node.config.interfaces
+        .filter((i) => i.ip && i.mask)
+        .map((i) => NetworkGraph.ipToNetwork(i.ip, i.mask));
+    }
+
+    const networks = new Set();
+    for (const neighbor of this.getNeighbors(nodeId)) {
+      const neighborNets = this.getNodeNetworks(neighbor.id, visited);
+      for (const n of neighborNets) networks.add(n);
+    }
+    return [...networks];
+  }
+
   /**
    * Get all distinct VLAN IDs configured across all nodes.
    */

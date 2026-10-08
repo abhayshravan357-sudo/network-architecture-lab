@@ -12,11 +12,6 @@ import {
 import { VNF_MAP } from '../../data/vnfs/vnfCatalog.js';
 import { vnfAssets } from '../../assets/assetMap.js';
 
-/**
- * Orchestration Stage — run the VNF lifecycle:
- * instantiate, allocate resources, scale, migrate, remove,
- * and observe utilization under simulated load.
- */
 export default function OrchestrationStage() {
   const graph = useGameStore((s) => s.network.graph);
   const nfvState = useGameStore((s) => s.nfvState);
@@ -42,6 +37,12 @@ export default function OrchestrationStage() {
     () => scoreOrchestration(activeInstances, { actions, load }),
     [activeInstances, actions, load]
   );
+
+  const overloaded = useMemo(() => activeInstances.filter((i) => (i.utilization ?? 0) > 1), [activeInstances]);
+  const warned = useMemo(() => activeInstances.filter((i) => {
+    const util = i.utilization ?? 0;
+    return util >= 0.7 && util <= 1;
+  }), [activeInstances]);
 
   if (deployments.length === 0) {
     return (
@@ -98,6 +99,24 @@ export default function OrchestrationStage() {
     updateInstance(removed);
   };
 
+  const handleAutoRemediate = () => {
+    const updated = [...instances];
+    let changed = false;
+
+    for (const inst of updated) {
+      const util = inst.utilization ?? 0;
+      if (util > 1 && inst.state !== 'scaled') {
+        updated.splice(updated.indexOf(inst), 1, scaleInstance(inst));
+        recordOrchestrationAction({ kind: 'auto-scale', instanceId: inst.id, timestamp: Date.now() });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      applyCurrentLoad(updated, load);
+    }
+  };
+
   const statusColor = (status) =>
     status === 'overloaded' ? 'var(--c-danger)' : status === 'warning' ? 'var(--c-warning)' : 'var(--c-success)';
 
@@ -129,6 +148,23 @@ export default function OrchestrationStage() {
                 {health.active} running · {health.overloaded} overloaded{health.avgUtilization != null ? ` · avg ${health.avgUtilization}%` : ''}
               </span>
             </div>
+            {(overloaded.length > 0 || warned.length > 0) && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {overloaded.map((inst) => (
+                  <div key={inst.id} style={{ fontSize: '0.84rem', color: 'var(--c-danger)' }}>
+                    {inst.name} is overloaded — scale or migrate it.
+                  </div>
+                ))}
+                {warned.map((inst) => (
+                  <div key={inst.id} style={{ fontSize: '0.84rem', color: 'var(--c-warning)' }}>
+                    {inst.name} is under warning load — consider scaling soon.
+                  </div>
+                ))}
+                <button className="btn btn-accent btn-sm" onClick={handleAutoRemediate} style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+                  Auto-remediate overload
+                </button>
+              </div>
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 260, maxWidth: 420 }}>
             <div className="eyebrow" style={{ marginBottom: 6 }}>

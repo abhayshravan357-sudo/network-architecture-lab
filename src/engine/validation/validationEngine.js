@@ -140,19 +140,43 @@ export class ValidationEngine {
   _checkPathExists(rule, base) {
     const [typeA, typeB] = rule.pathBetween ?? [];
     if (!typeA || !typeB) return { ...base, message: 'Invalid rule configuration' };
-    const path = this.graph.findPathBetweenTypes(typeA, typeB);
-    if (!path) {
-      return { ...base, score: 0, message: `\u2717 No path found between ${typeA} and ${typeB}`, hintId: 'hint-need-l3-device' };
-    }
+
+    // For inter-subnet routing checks, use routed path finding
     if (rule.requiresL3) {
+      const nodesA = this.graph.getNodesByType(typeA);
+      const nodesB = this.graph.getNodesByType(typeB);
+
+      // Check if ANY pair of typeA/typeB nodes can communicate via routed path
+      let routedPath = null;
+      for (const a of nodesA) {
+        for (const b of nodesB) {
+          routedPath = this.graph.findRoutedPath(a.id, b.id);
+          if (routedPath) break;
+        }
+        if (routedPath) break;
+      }
+
+      if (!routedPath) {
+        return { ...base, score: 0, message: `No routed path from ${typeA} to ${typeB} \u2014 subnets may be disconnected or router interfaces missing`, hintId: 'hint-need-l3-device' };
+      }
+
+      // Verify there's actually a Layer-3 device on the path
       const L3_TYPES = ['router', 'l3Switch'];
-      const pathNodes = path.map((id) => this.graph.getNode(id));
+      const pathNodes = routedPath.map((id) => this.graph.getNode(id));
       const hasL3 = pathNodes.some((n) => L3_TYPES.includes(n?.type));
       if (!hasL3) {
-        return { ...base, partial: true, score: 40, message: `\u25b3 Path exists but no Layer-3 device on the route`, hintId: 'hint-need-l3-device' };
+        return { ...base, partial: true, score: 40, message: `Path exists but no Layer-3 device on the route`, hintId: 'hint-need-l3-device' };
       }
+
+      return { ...base, passed: true, score: 100, message: `Routed path verified from ${typeA} to ${typeB} (cross-subnet)` };
     }
-    return { ...base, passed: true, score: 100, message: `\u2713 Path exists from ${typeA} to ${typeB}` };
+
+    // L2-only path check (same subnet)
+    const path = this.graph.findPathBetweenTypes(typeA, typeB);
+    if (!path) {
+      return { ...base, score: 0, message: `No path found between ${typeA} and ${typeB}`, hintId: 'hint-need-l3-device' };
+    }
+    return { ...base, passed: true, score: 100, message: `Path exists from ${typeA} to ${typeB} (same subnet)` };
   }
 
   _checkServersPresent(rule, base) {

@@ -111,7 +111,7 @@ const initialState = {
   },
 
   // ── SDN stage ─────────────────────────────────────
-  /** { controllerPlaced, flowRules, failedEdgeId, reroute } */
+  /** { controllerPlaced, policies, flowRules, policyFlows, failedEdgeId, reroute } */
   sdnState: null,
 
   // ── NFV stage ─────────────────────────────────────
@@ -304,6 +304,49 @@ export const useGameStore = create(
       saveSDNResult(result) {
         set((state) => ({
           scores: { ...state.scores, sdn: result.overall },
+        }));
+      },
+
+      addSDNPolicy(policy) {
+        set((state) => ({
+          sdnState: state.sdnState
+            ? { ...state.sdnState, policies: [...(state.sdnState.policies ?? []), policy] }
+            : { controllerPlaced: false, policies: [policy], flowRules: [], policyFlows: [], failedEdgeId: null, reroute: null },
+        }));
+      },
+
+      removeSDNPolicy(policyId) {
+        set((state) => ({
+          sdnState: state.sdnState
+            ? {
+                ...state.sdnState,
+                policies: (state.sdnState.policies ?? []).filter((p) => p.id !== policyId),
+              }
+            : null,
+        }));
+      },
+
+      setSDNPolicyFlows(policyFlows) {
+        set((state) => ({
+          sdnState: state.sdnState
+            ? { ...state.sdnState, policyFlows }
+            : { controllerPlaced: false, policies: [], flowRules: [], policyFlows, failedEdgeId: null, reroute: null },
+        }));
+      },
+
+      recordSDNEvent(event) {
+        set((state) => ({
+          sdnState: state.sdnState
+            ? { ...state.sdnState, sdnEvents: [...(state.sdnState.sdnEvents ?? []), event] }
+            : { controllerPlaced: false, policies: [], flowRules: [], policyFlows: [], failedEdgeId: null, reroute: null, sdnEvents: [event] },
+        }));
+      },
+
+      setSDNTrafficResult(result) {
+        set((state) => ({
+          sdnState: state.sdnState
+            ? { ...state.sdnState, activeTrafficTest: result }
+            : { controllerPlaced: false, policies: [], flowRules: [], policyFlows: [], failedEdgeId: null, reroute: null, sdnEvents: [], activeTrafficTest: result },
         }));
       },
 

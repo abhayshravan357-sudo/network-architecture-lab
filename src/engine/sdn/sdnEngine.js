@@ -13,10 +13,98 @@
 
 import { NetworkGraph } from '../graph/graphModel.js';
 
-/** Device types that become SDN-programmable data-plane switches */
-const SWITCH_TYPES = ['l2Switch', 'l3Switch'];
-/** Device types that originate/terminate traffic */
+const SWITCH_TYPES = new Set(['l2Switch', 'l3Switch']);
 const ENDPOINT_TYPES = ['pc', 'laptop', 'server', 'accessPoint'];
+
+function getSwitchIds(graph) {
+  return graph.getNodes().filter((n) => SWITCH_TYPES.has(n.type)).map((n) => n.id);
+}
+
+function getEndpointNodes(graph) {
+  return graph.getNodes().filter((n) => ENDPOINT_TYPES.includes(n.type));
+}
+
+function findPath(graph, fromId, toId) {
+  if (!graph.hasNode(fromId) || !graph.hasNode(toId)) return null;
+  const visited = new Set();
+  const queue = [[fromId]];
+  while (queue.length > 0) {
+    const path = queue.shift();
+    const current = path[path.length - 1];
+    if (current === toId) return path;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const neighbor of graph.getNeighbors(current)) {
+      if (!visited.has(neighbor.id)) queue.push([...path, neighbor.id]);
+    }
+  }
+  return null;
+}
+
+function highestPriorityFlowRule(policyFlows, fromId, toId) {
+  let best = null;
+  for (const rule of policyFlows) {
+    const match = rule.match;
+    if (!match || match.source !== fromId || match.destination !== toId) continue;
+    if (best && best.priority >= rule.priority) continue;
+    best = rule;
+  }
+  return best;
+}
+
+/**
+ * Evaluate whether traffic from one endpoint to another would be allowed
+ * under the current SDN policy/flow configuration.
+ *
+ * Returns a deterministic result including matched policy, flow rule,
+ * traversed path, and final decision.
+ */
+export function evaluateTraffic(graphData, sdnState, fromId, toId) {
+  const graph = NetworkGraph.fromJSON(graphData);
+  const policyFlows = sdnState?.policyFlows ?? [];
+  const policies = sdnState?.policies ?? [];
+
+  const fromNode = graph.getNode(fromId);
+  const toNode = graph.getNode(toId);
+  if (!fromNode || !toNode) {
+    return { allowed: false, reason: 'missing-endpoint', path: null, policy: null, flowRule: null };
+  }
+
+  const path = findPath(graph, fromId, toId);
+  if (!path) {
+    return { allowed: false, reason: 'no-path', path: null, policy: null, flowRule: null };
+  }
+
+  const policyRule = highestPriorityFlowRule(policyFlows, fromId, toId);
+  if (policyRule) {
+    const matchedPolicy = policies.find((p) => p.id === policyRule.policyId) || null;
+    const dropped = policyRule.action.type === 'drop';
+    return {
+      allowed: !dropped,
+      reason: dropped ? 'policy-deny' : 'policy-allow',
+      path,
+      policy: matchedPolicy,
+      flowRule: policyRule,
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: 'default-forward',
+    path,
+    policy: null,
+    flowRule: null,
+  };
+}
+
+/**
+ * Resolve candidate endpoint IDs for a traffic test from current topology.
+ */
+export function resolveTrafficCandidates(graphData) {
+  const graph = NetworkGraph.fromJSON(graphData);
+  const endpoints = getEndpointNodes(graph);
+  return endpoints.map((n) => ({ id: n.id, type: n.type, label: n.config?.label || n.id }));
+}
 
 /**
  * Derive the SDN model of an existing architecture.
@@ -25,7 +113,7 @@ const ENDPOINT_TYPES = ['pc', 'laptop', 'server', 'accessPoint'];
  */
 export function deriveSDNModel(graphData) {
   const graph = NetworkGraph.fromJSON(graphData);
-  const switches = graph.getNodes().filter((n) => SWITCH_TYPES.includes(n.type));
+  const switches = graph.getNodes().filter((n) => SWITCH_TYPES.has(n.type));
   const endpoints = graph.getNodes().filter((n) => ENDPOINT_TYPES.includes(n.type));
   const l3Devices = graph.getNodes().filter((n) => n.type === 'router' || n.type === 'l3Switch');
 
@@ -57,7 +145,7 @@ export function deriveSDNModel(graphData) {
  */
 export function generateFlowRules(graphData) {
   const graph = NetworkGraph.fromJSON(graphData);
-  const switches = graph.getNodes().filter((n) => SWITCH_TYPES.includes(n.type));
+  const switches = graph.getNodes().filter((n) => SWITCH_TYPES.has(n.type));
   const endpoints = graph.getNodes().filter((n) => ENDPOINT_TYPES.includes(n.type));
   const l3Ids = new Set(
     graph.getNodes().filter((n) => n.type === 'router' || n.type === 'l3Switch').map((n) => n.id)
@@ -75,14 +163,14 @@ export function generateFlowRules(graphData) {
     }
     // Isolated endpoint: rule only for the switch it is directly attached to.
     if (!path) {
-      const attached = graph.getNeighbors(endpoint.id).find((n) => SWITCH_TYPES.includes(n.type));
+      const attached = graph.getNeighbors(endpoint.id).find((n) => SWITCH_TYPES.has(n.type));
       if (attached) path = [endpoint.id, attached.id];
     }
     if (!path) continue;
 
     const vlan = endpoint.config?.vlan ?? null;
     for (const nodeId of path) {
-      if (!SWITCH_TYPES.includes(graph.getNode(nodeId)?.type ?? '')) continue;
+      if (!SWITCH_TYPES.has(graph.getNode(nodeId)?.type ?? '')) continue;
       seq += 1;
       rules.push({
         id: `flow-${seq}`,
@@ -173,7 +261,7 @@ export function computeReroute(graphData, failedEdgeId) {
  */
 export function scoreSDN(graphData, sdnState) {
   const graph = NetworkGraph.fromJSON(graphData);
-  const totalSwitches = graph.getNodes().filter((n) => SWITCH_TYPES.includes(n.type)).length;
+  const totalSwitches = graph.getNodes().filter((n) => SWITCH_TYPES.has(n.type)).length;
   if (totalSwitches === 0) {
     return { overall: 0, coverage: 0, flowRules: 0, reroute: 0, message: 'No switches to control' };
   }
@@ -204,4 +292,4 @@ export function scoreSDN(graphData, sdnState) {
   };
 }
 
-export default { deriveSDNModel, generateFlowRules, computeReroute, scoreSDN };
+export default { deriveSDNModel, generateFlowRules, computeReroute, scoreSDN, evaluateTraffic, resolveTrafficCandidates };

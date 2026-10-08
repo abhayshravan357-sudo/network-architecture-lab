@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore, STAGES } from '../../state/gameStore.js';
+import { learningAssets } from '../../assets/assetMap.js';
 import { getScenario } from '../../data/scenarios/index.js';
 import hintLibrary from '../../data/hints/hintLibrary.js';
 
@@ -127,7 +128,10 @@ export default function PlanningQuiz() {
 
           {showHint && (
             <div className="hint-panel" style={{ marginTop: '24px' }}>
-              <div className="hint-panel-title">🧠 Socratic Hint</div>
+              <div className="hint-panel-title">
+                <img src={learningAssets.brain} alt="" style={{ width: '1rem', height: '1rem', verticalAlign: '-0.15rem', marginRight: 6 }} />
+                Socratic Hint
+              </div>
               <div className="hint-text">
                 {hintSteps.length > 0
                   ? hintSteps[Math.min(hintIndex, hintSteps.length - 1)]

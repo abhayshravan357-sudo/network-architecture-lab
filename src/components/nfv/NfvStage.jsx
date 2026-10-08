@@ -4,13 +4,14 @@ import { getScenario } from '../../data/scenarios/index.js';
 import { deployVNF, buildServiceChain, scoreNFV } from '../../engine/nfv/nfvEngine.js';
 import { VNF_MAP } from '../../data/vnfs/vnfCatalog.js';
 import { DEVICE_CATALOG_MAP } from '../../data/devices/deviceCatalog.js';
-import { vnfAssets } from '../../assets/assetMap.js';
+import { vnfAssets, uiAssets } from '../../assets/assetMap.js';
 
-/**
- * NFV Stage — decide which network functions should be
- * virtualized, deploy VNFs onto server hosts, and order
- * them into a service chain.
- */
+const DEFAULT_HOST_RESOURCES = {
+  cpu: 8,
+  memory: 16,
+  throughput: 5000,
+};
+
 export default function NfvStage() {
   const graph = useGameStore((s) => s.network.graph);
   const nfvState = useGameStore((s) => s.nfvState);
@@ -22,6 +23,7 @@ export default function NfvStage() {
   const saveNFVResult = useGameStore((s) => s.saveNFVResult);
 
   const [selectedVnfId, setSelectedVnfId] = useState(null);
+  const [deployError, setDeployError] = useState(null);
   const scenario = getScenario(activeScenarioId);
 
   const nodes = graph?.nodes ?? [];
@@ -30,8 +32,6 @@ export default function NfvStage() {
   const deployments = nfvState?.deployments ?? [];
   const serviceChain = nfvState?.serviceChain ?? [];
 
-  // VNFs suggested by the scenario first (matched by the
-  // physical function they replace), then the rest of the catalog.
   const opportunityReplaces = (scenario?.vnfOpportunities ?? []).map((o) => o.replaces);
   const palette = useMemo(() => {
     const all = Object.values(VNF_MAP);
@@ -49,6 +49,37 @@ export default function NfvStage() {
     () => scoreNFV({ nodes, edges }, { deployments, serviceChain }, scenario),
     [nodes, edges, deployments, serviceChain, scenario]
   );
+
+  const hostResources = useMemo(() => {
+    const map = {};
+    for (const s of servers) {
+      const hosted = deployments.filter((d) => d.hostNodeId === s.id);
+      const allocated = hosted.reduce(
+        (acc, d) => {
+          const vnf = VNF_MAP[d.vnfId];
+          if (!vnf) return acc;
+          acc.cpu += vnf.cpu;
+          acc.memory += vnf.memory;
+          acc.throughput += vnf.throughput;
+          return acc;
+        },
+        { cpu: 0, memory: 0, throughput: 0 }
+      );
+      const caps = s.config?.resources ?? DEFAULT_HOST_RESOURCES;
+      map[s.id] = {
+        cpu: caps.cpu,
+        memory: caps.memory,
+        throughput: caps.throughput,
+        allocated,
+        remaining: {
+          cpu: Math.max(0, caps.cpu - allocated.cpu),
+          memory: Math.max(0, caps.memory - allocated.memory),
+          throughput: Math.max(0, caps.throughput - allocated.throughput),
+        },
+      };
+    }
+    return map;
+  }, [servers, deployments]);
 
   if (nodes.length === 0) {
     return (
@@ -69,9 +100,26 @@ export default function NfvStage() {
 
   const handleDeploy = (hostNodeId) => {
     if (!selectedVnfId) return;
+    setDeployError(null);
+    const vnf = VNF_MAP[selectedVnfId];
+    const resources = hostResources[hostNodeId];
+    if (!vnf || !resources) return;
+
+    if (resources.remaining.cpu < vnf.cpu || resources.remaining.memory < vnf.memory || resources.remaining.throughput < vnf.throughput) {
+      const reasons = [];
+      if (resources.remaining.cpu < vnf.cpu) reasons.push(`CPU ${resources.remaining.cpu}/${vnf.cpu}`);
+      if (resources.remaining.memory < vnf.memory) reasons.push(`memory ${resources.remaining.memory}/${vnf.memory}`);
+      if (resources.remaining.throughput < vnf.throughput) reasons.push(`throughput ${resources.remaining.throughput}/${vnf.throughput}`);
+      setDeployError(`Insufficient host resources on ${hostNodeId}: ${reasons.join(', ')}`);
+      return;
+    }
+
     const result = deployVNF(selectedVnfId, hostNodeId, { nodes, edges });
-    if (!result.ok) return;
-    if (deployments.some((d) => d.id === result.deployment.id)) return; // already deployed
+    if (!result.ok) {
+      setDeployError(result.error);
+      return;
+    }
+    if (deployments.some((d) => d.id === result.deployment.id)) return;
     deployVNFAction(result.deployment);
   };
 
@@ -121,7 +169,7 @@ export default function NfvStage() {
                     cursor: 'pointer',
                     width: '100%',
                   }}
-                  onClick={() => setSelectedVnfId(v.id)}
+                  onClick={() => { setSelectedVnfId(v.id); setDeployError(null); }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
@@ -145,7 +193,7 @@ export default function NfvStage() {
           </div>
         </div>
 
-        {/* Server hosts */}
+        {/* Server hosts with resource accounting */}
         <div className="panel" style={{ padding: 20 }}>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Server Hosts</div>
           {!selectedVnfId && (
@@ -153,9 +201,13 @@ export default function NfvStage() {
               Select a VNF from the catalog, then click a server to deploy it there.
             </p>
           )}
+          {deployError && (
+            <div style={{ color: 'var(--c-danger)', fontSize: '0.84rem', marginBottom: 10 }}>{deployError}</div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {servers.map((s) => {
               const hosted = deployments.filter((d) => d.hostNodeId === s.id);
+              const resources = hostResources[s.id] ?? DEFAULT_HOST_RESOURCES;
               return (
                 <div
                   key={s.id}
@@ -170,10 +222,18 @@ export default function NfvStage() {
                   title={selectedVnfId ? `Deploy ${selectedVnfId} here` : undefined}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700 }}>🖥️ {s.id}</span>
+                    <span style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                      <img src={uiAssets.monitor} alt="" style={{ width: '1rem', height: '1rem' }} />
+                      {s.id}
+                    </span>
                     <span className="chip" style={{ fontSize: '0.7rem' }}>
                       {hosted.length} VNF(s)
                     </span>
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--c-text-dim)', marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div>CPU: <span className="mono">{resources.allocated.cpu}</span> / <span className="mono">{resources.cpu}</span> · Remaining: <span className="mono">{resources.remaining.cpu}</span></div>
+                    <div>Memory: <span className="mono">{resources.allocated.memory}</span> / <span className="mono">{resources.memory}</span> · Remaining: <span className="mono">{resources.remaining.memory}</span></div>
+                    <div>Throughput: <span className="mono">{resources.allocated.throughput}</span> / <span className="mono">{resources.throughput}</span> · Remaining: <span className="mono">{resources.remaining.throughput}</span></div>
                   </div>
                   {hosted.map((d) => (
                     <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, fontSize: '0.84rem' }}>

@@ -12,10 +12,6 @@
 
 import { NetworkGraph } from '../graph/graphModel.js';
 
-export { runPing } from './ping.js';
-export { arpRequest } from './arp.js';
-export { icmpEcho } from './icmp.js';
-
 /**
  * Apply a simulation event to the network and report impact.
  *
