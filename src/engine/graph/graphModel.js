@@ -16,6 +16,10 @@ export class NetworkGraph {
     this._nodes = new Map(data.nodes.map((n) => [n.id, { ...n }]));
     /** @type {Map<string, GraphEdge>} */
     this._edges = new Map(data.edges.map((e) => [e.id, { ...e }]));
+    // ARP cache: Map<nodeId, Map<ipAddress, macAddress>>
+    this._arpCaches = new Map();
+    // MAC address tables for switches: Map<switchId, Map<macAddress, portId>>
+    this._macTables = new Map();
   }
 
   // ── Node operations ─────────────────────────────────────────────────────
@@ -85,11 +89,172 @@ export class NetworkGraph {
     return [...this._edges.values()];
   }
 
+  getEdges() {
+    return [...this._edges.values()];
+  }
+
   /** All edges that include `nodeId` as either endpoint */
   getEdgesOf(nodeId) {
     return this.getEdges().filter(
       (e) => e.source === nodeId || e.target === nodeId
     );
+  }
+
+  // ── ARP Cache operations ──────────────────────────────────────────────────
+  /**
+   * Get the ARP cache for a node
+   * @param {string} nodeId
+   * @returns {Map<string, string>} Map of IP -> MAC
+   */
+  getArpCache(nodeId) {
+    if (!this._arpCaches.has(nodeId)) {
+      this._arpCaches.set(nodeId, new Map());
+    }
+    return this._arpCaches.get(nodeId);
+  }
+
+  /**
+   * Add or update an ARP entry in a node's cache
+   * @param {string} nodeId
+   * @param {string} ipAddress
+   * @param {string} macAddress
+   */
+  setArpEntry(nodeId, ipAddress, macAddress) {
+    const cache = this.getArpCache(nodeId);
+    cache.set(ipAddress, macAddress);
+  }
+
+  /**
+   * Get MAC address from ARP cache
+   * @param {string} nodeId
+   * @param {string} ipAddress
+   * @returns {string | undefined}
+   */
+  getArpEntry(nodeId, ipAddress) {
+    const cache = this.getArpCache(nodeId);
+    return cache.get(ipAddress);
+  }
+
+  /**
+   * Check if ARP cache has entry for IP
+   * @param {string} nodeId
+   * @param {string} ipAddress
+   * @returns {boolean}
+   */
+  hasArpEntry(nodeId, ipAddress) {
+    const cache = this.getArpCache(nodeId);
+    return cache.has(ipAddress);
+  }
+
+  /**
+   * Clear ARP cache for a node
+   * @param {string} nodeId
+   */
+  clearArpCache(nodeId) {
+    this._arpCaches.delete(nodeId);
+  }
+
+  // ── MAC Address Table (Switch Forwarding Table) ──────────────────────────
+  /**
+   * Get MAC address table for a switch
+   * @param {string} switchId
+   * @returns {Map<string, string>} Map of MAC -> port (neighbor node ID)
+   */
+  getMacTable(switchId) {
+    if (!this._macTables.has(switchId)) {
+      this._macTables.set(switchId, new Map());
+    }
+    return this._macTables.get(switchId);
+  }
+
+  /**
+   * Learn MAC address on a switch port (ingress port)
+   * @param {string} switchId
+   * @param {string} macAddress
+   * @param {string} portId - Neighbor node ID (the port where frame came from)
+   */
+  learnMac(switchId, macAddress, portId) {
+    const table = this.getMacTable(switchId);
+    table.set(macAddress, portId);
+  }
+
+  /**
+   * Look up MAC address in switch table
+   * @param {string} switchId
+   * @param {string} macAddress
+   * @returns {string | undefined} Port ID (neighbor node ID) or undefined
+   */
+  lookupMac(switchId, macAddress) {
+    const table = this.getMacTable(switchId);
+    return table.get(macAddress);
+  }
+
+  /**
+   * Check if MAC is known in switch table
+   * @param {string} switchId
+   * @param {string} macAddress
+   * @returns {boolean}
+   */
+  hasMacEntry(switchId, macAddress) {
+    const table = this.getMacTable(switchId);
+    return table.has(macAddress);
+  }
+
+  /**
+   * Flood frame to all ports except ingress
+   * @param {string} switchId
+   * @param {string} ingressPortId
+   * @returns {string[]} Array of neighbor node IDs (ports to flood to)
+   */
+  floodPorts(switchId, ingressPortId) {
+    const neighbors = this.getNeighbors(switchId);
+    return neighbors
+      .filter((n) => n.id !== ingressPortId)
+      .map((n) => n.id);
+  }
+
+  // ── MAC Address Generation ──────────────────────────────────────────────
+  /**
+   * Generate a deterministic MAC address for a node based on its ID
+   * @param {string} nodeId
+   * @returns {string} MAC address in format XX:XX:XX:XX:XX:XX
+   */
+  static generateMac(nodeId) {
+    let hash = 0;
+    for (let i = 0; i < nodeId.length; i++) {
+      hash = ((hash << 5) - hash) + nodeId.charCodeAt(i);
+      hash |= 0;
+    }
+    const bytes = [
+      (hash >> 24) & 0xff,
+      (hash >> 16) & 0xff,
+      (hash >> 8) & 0xff,
+      hash & 0xff,
+      (hash >> 4) & 0xff,
+      hash & 0xff,
+    ];
+    // Set locally administered bit (bit 1 of first byte)
+    bytes[0] = (bytes[0] | 0x02) & 0xfe;
+    return bytes.map((b) => b.toString(16).padStart(2, '0')).join(':');
+  }
+
+  /**
+   * Get or generate MAC address for a node's interface
+   * @param {string} nodeId
+   * @param {string} [interfaceName] - Optional interface name for multi-interface nodes
+   * @returns {string} MAC address
+   */
+  getNodeMac(nodeId, interfaceName) {
+    const node = this._nodes.get(nodeId);
+    if (!node) return null;
+    
+    const key = interfaceName ? `${nodeId}:${interfaceName}` : nodeId;
+    const cached = this.getArpEntry(nodeId, key);
+    if (cached) return cached;
+    
+    const mac = NetworkGraph.generateMac(key);
+    this.setArpEntry(nodeId, key, mac);
+    return mac;
   }
 
   // ── Graph queries ────────────────────────────────────────────────────────
@@ -106,6 +271,197 @@ export class NetworkGraph {
         return this._nodes.get(otherId);
       })
       .filter(Boolean);
+  }
+
+  /**
+   * Get the networks (CIDR) a node is DIRECTLY connected to via its own interfaces.
+   * This is different from getNodeNetworks which returns all reachable networks.
+   * @param {string} nodeId
+   * @returns {string[]} Array of CIDR networks
+   */
+  getNodeDirectNetworks(nodeId) {
+    const node = this._nodes.get(nodeId);
+    if (!node || !node.config?.interfaces) return [];
+    return node.config.interfaces
+      .filter((i) => i.ip && i.mask)
+      .map((i) => NetworkGraph.ipToNetwork(i.ip, i.mask));
+  }
+  /**
+   * Get the networks (CIDR) a node owns from its OWN configured addresses.
+   *
+   * Two configuration shapes are supported because the builder stores
+   * endpoint addresses as `config.ip` while routers keep `config.interfaces`:
+   *   - interfaces[] with ip + mask → network derived from that interface
+   *   - a bare `config.ip`           → network of the router interface that
+   *                                    contains it, else an assumed /24
+   *
+   * This is deliberately different from getNodeNetworks(), which returns every
+   * network reachable through the node's L2 neighbourhood. Same-subnet
+   * decisions must be based on the node's own addresses.
+   *
+   * @param {string} nodeId
+   * @returns {string[]} Array of CIDR networks
+   */
+  getNodeOwnNetworks(nodeId) {
+    const node = this._nodes.get(nodeId);
+    if (!node) return [];
+
+    const networks = new Set();
+    for (const iface of node.config?.interfaces ?? []) {
+      if (iface.ip && iface.mask) {
+        networks.add(NetworkGraph.ipToNetwork(iface.ip, iface.mask));
+      }
+    }
+
+    const ownIp = node.config?.ip;
+    if (ownIp && networks.size === 0) {
+      // Resolve the mask from the router interface that owns this address so
+      // the decision comes from real configuration, not an assumption.
+      for (const router of this.getRouterInterfaces()) {
+        if (NetworkGraph.networkContains(router.network, ownIp)) {
+          networks.add(router.network);
+          break;
+        }
+      }
+      // Fall back to the conventional /24 host assumption when no router
+      // interface in the topology claims this address.
+      if (networks.size === 0) networks.add(NetworkGraph.ipToNetwork(ownIp, 24));
+    }
+
+    return [...networks];
+  }
+
+  /**
+   * All configured addresses of a node (interfaces first, then config.ip).
+   * @param {string} nodeId
+   * @returns {string[]}
+   */
+  getNodeAddresses(nodeId) {
+    const node = this._nodes.get(nodeId);
+    if (!node) return [];
+    const addresses = (node.config?.interfaces ?? [])
+      .filter((i) => i.ip)
+      .map((i) => i.ip);
+    if (node.config?.ip && !addresses.includes(node.config.ip)) {
+      addresses.push(node.config.ip);
+    }
+    return addresses;
+  }
+
+  /**
+   * Resolve IP to MAC using ARP (simulated)
+   * For same-subnet: direct ARP
+   * For different subnet: ARP for gateway
+   * @param {string} srcNodeId - Source node ID
+   * @param {string} targetIp - Target IP address
+   * @returns {Object} { mac, viaGateway: boolean, gatewayNodeId?, targetNodeId?, steps: Array, error? }
+   */
+  resolveMac(srcNodeId, targetIp) {
+    const srcNode = this._nodes.get(srcNodeId);
+    if (!srcNode) return { mac: null, viaGateway: false, error: 'Source node not found' };
+    
+    // Check local ARP cache first
+    const cachedMac = this.getArpEntry(srcNodeId, targetIp);
+    if (cachedMac) {
+      return { mac: cachedMac, viaGateway: false, fromCache: true };
+    }
+    
+    // Find target node by IP
+    const targetNode = this._findNodeByIp(targetIp);
+    if (!targetNode) {
+      return { mac: null, viaGateway: false, error: `No node with IP ${targetIp}` };
+    }
+    
+    // Check if same subnet using DIRECT networks (node's own interfaces)
+    const srcNetworks = this.getNodeOwnNetworks(srcNodeId);
+    const targetNetworks = this.getNodeOwnNetworks(targetNode.id);
+    const commonNetwork = srcNetworks.find(n => targetNetworks.includes(n));
+    
+    if (commonNetwork) {
+      // Same subnet - direct ARP
+      const targetMac = this.getNodeMac(targetNode.id);
+      this.setArpEntry(srcNodeId, targetIp, targetMac);
+      this.setArpEntry(targetNode.id, srcNode.config?.interfaces?.[0]?.ip || '', this.getNodeMac(srcNodeId));
+      return { 
+        mac: targetMac, 
+        viaGateway: false, 
+        targetNodeId: targetNode.id,
+        steps: [
+          { type: 'arp-request', from: srcNodeId, to: targetNode.id, targetIp },
+          { type: 'arp-reply', from: targetNode.id, to: srcNodeId, mac: targetMac }
+        ]
+      };
+    } else {
+      // Different subnet - need gateway
+      const gatewayIp = this._findGatewayIp(srcNodeId, targetIp);
+      if (!gatewayIp) {
+        return { mac: null, viaGateway: false, error: 'No gateway found for destination' };
+      }
+      
+      const gatewayNode = this._findNodeByIp(gatewayIp);
+      if (!gatewayNode) {
+        return { mac: null, viaGateway: true, error: 'Gateway node not found' };
+      }
+      
+      const gatewayMac = this.getNodeMac(gatewayNode.id);
+      this.setArpEntry(srcNodeId, gatewayIp, gatewayMac);
+      this.setArpEntry(gatewayNode.id, srcNode.config?.interfaces?.[0]?.ip || '', this.getNodeMac(srcNodeId));
+      
+      return { 
+        mac: gatewayMac, 
+        viaGateway: true, 
+        gatewayNodeId: gatewayNode.id,
+        targetIp,
+        steps: [
+          { type: 'arp-request', from: srcNodeId, to: gatewayNode.id, targetIp: gatewayIp },
+          { type: 'arp-reply', from: gatewayNode.id, to: srcNodeId, mac: gatewayMac }
+        ]
+      };
+    }
+  }
+
+  /**
+   * Find node by IP address
+   * @param {string} ip 
+   * @returns {GraphNode|null}
+   */
+  _findNodeByIp(ip) {
+    for (const node of this._nodes.values()) {
+      if (node.config?.interfaces) {
+        for (const iface of node.config.interfaces) {
+          if (iface.ip === ip) return node;
+        }
+      }
+      // Also check if node has a simple IP config
+      if (node.config?.ip === ip) return node;
+    }
+    return null;
+  }
+
+  /**
+   * Find gateway IP for reaching target IP
+   * @param {string} srcNodeId
+   * @param {string} targetIp
+   * @returns {string|null}
+   */
+  _findGatewayIp(srcNodeId, targetIp) {
+    const srcNode = this._nodes.get(srcNodeId);
+    if (!srcNode) return null;
+
+    // Find router on path to target, based on the addresses each side owns
+    const srcNetworks = this.getNodeOwnNetworks(srcNodeId);
+    const targetNode = this._findNodeByIp(targetIp);
+    if (!targetNode) return null;
+
+    const targetNetworks = this.getNodeOwnNetworks(targetNode.id);
+
+    // A gateway is the router interface that faces the source subnet and also
+    // owns an interface in the destination subnet.
+    const spanning = this.getRoutersSpanning(srcNetworks, targetNetworks);
+    for (const router of spanning) {
+      return router.ingress.interface.ip;
+    }
+    return null;
   }
 
   /**
@@ -241,11 +597,83 @@ export class NetworkGraph {
    */
   static ipToNetwork(ip, mask) {
     const parts = ip.split('.').map(Number);
-    const maskBits = 32 - mask;
-    const maskValue = mask === 0 ? 0 : (~((1 << maskBits) - 1)) >>> 0;
+    // Handle both CIDR notation (e.g., '24') and dotted decimal (e.g., '255.255.255.0')
+    let maskBits;
+    if (typeof mask === 'string' && mask.includes('.')) {
+      // Convert dotted decimal to CIDR
+      const maskParts = mask.split('.').map(Number);
+      let maskInt = (maskParts[0] << 24) | (maskParts[1] << 16) | (maskParts[2] << 8) | maskParts[3];
+      maskBits = 0;
+      for (let i = 31; i >= 0; i--) {
+        if (maskInt & (1 << i)) maskBits++;
+        else break;
+      }
+    } else {
+      maskBits = Number(mask);
+    }
+    const maskBits32 = 32 - maskBits;
+    const maskValue = maskBits === 0 ? 0 : (~((1 << maskBits32) - 1)) >>> 0;
     const ipInt = (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3];
     const netInt = ipInt & maskValue;
-    return `${(netInt >>> 24) & 255}.${(netInt >>> 16) & 255}.${(netInt >>> 8) & 255}.${netInt & 255}/${mask}`;
+    return `${(netInt >>> 24) & 255}.${(netInt >>> 16) & 255}.${(netInt >>> 8) & 255}.${netInt & 255}/${maskBits}`;
+  }
+
+  /**
+   * Does a CIDR network contain the given IP address?
+   * @param {string} networkCidr e.g. "192.168.1.0/24"
+   * @param {string} ip e.g. "192.168.1.37"
+   * @returns {boolean}
+   */
+  static networkContains(networkCidr, ip) {
+    if (!networkCidr || !ip) return false;
+    const [netIp, prefixRaw] = networkCidr.split('/');
+    const prefix = Number(prefixRaw);
+    if (!netIp || Number.isNaN(prefix) || prefix < 0 || prefix > 32) return false;
+
+    const toInt = (addr) => {
+      const parts = addr.split('.').map(Number);
+      if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) return null;
+      return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+    };
+
+    const netInt = toInt(netIp);
+    const ipInt = toInt(ip);
+    if (netInt === null || ipInt === null) return false;
+    const mask = prefix === 0 ? 0 : (~((1 << (32 - prefix)) - 1)) >>> 0;
+    return (netInt & mask) === (ipInt & mask);
+  }
+
+  /**
+   * Find routers that have an interface in a network of each set.
+   *
+   * Router interfaces are inspected per router (not per interface), because a
+   * single interface can only belong to one subnet — a router routes between
+   * subnets by owning an interface in each of them.
+   *
+   * @param {string[]} networksA CIDR networks, e.g. the source subnets
+   * @param {string[]} networksB CIDR networks, e.g. the destination subnets
+   * @returns {Array<{ nodeId, interfaces: Array, ingress: Object }>}
+   *   `ingress` is the interface that faces networksA.
+   */
+  getRoutersSpanning(networksA, networksB) {
+    const netsA = new Set(networksA ?? []);
+    const netsB = new Set(networksB ?? []);
+    const byRouter = new Map();
+
+    for (const ri of this.getRouterInterfaces()) {
+      if (!byRouter.has(ri.nodeId)) byRouter.set(ri.nodeId, []);
+      byRouter.get(ri.nodeId).push(ri);
+    }
+
+    const spanning = [];
+    for (const [nodeId, interfaces] of byRouter) {
+      const nets = interfaces.map((i) => i.network);
+      const inA = interfaces.find((i) => netsA.has(i.network));
+      const inB = interfaces.find((i) => netsB.has(i.network));
+      // A router reaches both sides when it owns an interface in each set.
+      if (inA && inB) spanning.push({ nodeId, interfaces, ingress: inA, egress: inB });
+    }
+    return spanning;
   }
 
   /**
@@ -307,14 +735,10 @@ export class NetworkGraph {
     if (common) return l2Path;
 
     // Different subnets: need a router with interfaces in BOTH networks
-    const routerInterfaces = this.getRouterInterfaces();
-    for (const router of routerInterfaces) {
-      const hasStartNet = startNetworks.includes(router.network);
-      const hasEndNet = endNetworks.includes(router.network);
-      if (hasStartNet && hasEndNet) {
-        // Verify the router is actually on the L2 path
-        if (l2Path.includes(router.nodeId)) return l2Path;
-      }
+    const spanning = this.getRoutersSpanning(startNetworks, endNetworks);
+    for (const router of spanning) {
+      // Verify the router is actually on the L2 path
+      if (l2Path.includes(router.nodeId)) return l2Path;
     }
 
     // No suitable router found on the path

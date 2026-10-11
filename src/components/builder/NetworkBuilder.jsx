@@ -14,6 +14,7 @@ import { useGameStore, STAGES } from '../../state/gameStore.js';
 import { getScenario } from '../../data/scenarios/index.js';
 import { getDeviceDef } from '../../data/devices/deviceCatalog.js';
 import { deviceAssets } from '../../assets/assetMap.js';
+import { useCollaboration, useSyncToYjs } from '../../collaboration/CollaborationProvider.jsx';
 import DeviceNode from './DeviceNode.jsx';
 import DeviceConsole from './DeviceConsole.jsx';
 
@@ -211,6 +212,8 @@ function ConfigPanel({ selectedNode, updateNodeData }) {
 // ── Main Network Builder Component ───────────────────────────────────────────
 export default function NetworkBuilder() {
   const reactFlowWrapper = useRef(null);
+  const syncToYjs = useSyncToYjs();
+  const { projectId } = useCollaboration();
 
   const activeScenarioId = useGameStore((s) => s.activeScenarioId);
   const goToStage = useGameStore((s) => s.goToStage);
@@ -225,6 +228,11 @@ export default function NetworkBuilder() {
   const [consoleNodeId, setConsoleNodeId] = useState(null);
   const hasFittedView = useRef(false);
 
+  // Sync to Yjs when nodes/edges change
+  useEffect(() => {
+    syncToYjs(nodes, edges);
+  }, [nodes, edges, syncToYjs]);
+
   useEffect(() => {
     if (!reactFlowInstance || hasFittedView.current) return;
     if (useGameStore.getState().network.rfNodes.length > 0) {
@@ -236,8 +244,17 @@ export default function NetworkBuilder() {
     }
   }, [reactFlowInstance]);
 
+  // Determine if we're in collaboration mode (projectId but no scenario)
+  const isCollabMode = projectId && !activeScenarioId;
   const scenario = getScenario(activeScenarioId);
-  if (!scenario) return null;
+  
+  // In collab mode without scenario, provide a default resource pool (unlimited devices)
+  const resourcePool = isCollabMode 
+    ? { router: 99, l2Switch: 99, l3Switch: 99, firewall: 99, server: 99, accessPoint: 99, pc: 99, laptop: 99, cloud: 99, wirelessController: 99 }
+    : (scenario?.resourcePool ?? {});
+
+  // Show empty state message when network is empty
+  const isEmpty = nodes.length === 0 && edges.length === 0;
 
   const nodeTypes = useMemo(() => ({ deviceNode: DeviceNode }), []);
 
@@ -358,7 +375,7 @@ export default function NetworkBuilder() {
   return (
     <div className="builder-layout anim-fade-in">
       <BuilderPalette
-        resourcePool={scenario.resourcePool}
+        resourcePool={resourcePool}
         nodeCounts={nodeCounts}
       />
 
@@ -385,6 +402,33 @@ export default function NetworkBuilder() {
             }}
             maskColor="rgba(6, 13, 26, 0.7)"
           />
+          {isEmpty && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              color: 'var(--c-text-dim)',
+              maxWidth: 300,
+              padding: '24px',
+              background: 'var(--c-bg-elevated)',
+              border: '1px solid var(--c-border)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px', color: 'var(--c-text)' }}>
+                Your network is empty
+              </div>
+              <div style={{ fontSize: '0.875rem', lineHeight: 1.5, marginBottom: '16px' }}>
+                Drag devices from the palette on the left to start building your network.
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--c-text-dim)', fontFamily: 'monospace' }}>
+                Collaboration mode: {projectId?.slice(0, 8)}...
+              </div>
+            </div>
+          )}
         </ReactFlow>
       </div>
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { scenarios } from '../data/scenarios/index.js';
 
 /**
  * Stage progression for the learning journey.
@@ -19,6 +20,9 @@ export const STAGES = {
   ORCHESTRATION: 'orchestration',
   SIMULATION: 'simulation',
   RESULTS: 'results',
+  RANDOM_CHALLENGE: 'random-challenge',
+  PRACTICE_LAB: 'practice-lab',
+  LEARN_CONCEPTS: 'learn-concepts',
 };
 
 /**
@@ -39,6 +43,9 @@ export const STAGE_ORDER = [
   STAGES.ORCHESTRATION,
   STAGES.SIMULATION,
   STAGES.RESULTS,
+  STAGES.RANDOM_CHALLENGE,
+  STAGES.PRACTICE_LAB,
+  STAGES.LEARN_CONCEPTS,
 ];
 
 /** Labels shown in the top navigation breadcrumb */
@@ -56,6 +63,9 @@ export const STAGE_LABELS = {
   [STAGES.ORCHESTRATION]: 'Orchestrate',
   [STAGES.SIMULATION]: 'Simulate',
   [STAGES.RESULTS]: 'Results',
+  [STAGES.RANDOM_CHALLENGE]: 'Challenge',
+  [STAGES.PRACTICE_LAB]: 'Practice',
+  [STAGES.LEARN_CONCEPTS]: 'Concepts',
 };
 
 const initialNetworkState = {
@@ -77,6 +87,14 @@ const initialState = {
   currentStage: STAGES.HOME,
   /** 'scenario' | 'random' | 'practice' */
   gameMode: null,
+
+  // ── Project Management ───────────────────────────────────
+  projectId: null,
+  projectName: null,
+  workingCopyId: null,
+  baseRevisionId: null,
+  branchName: 'main',
+  unsavedChanges: false,
 
   // ── Active mission ───────────────────────────────────────
   activeScenarioId: null,
@@ -162,9 +180,112 @@ export const useGameStore = create(
         });
       },
 
+      /** Start a random challenge — picks a random scenario and begins immediately */
+      startRandomChallenge() {
+        const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+        if (!scenario) return;
+        set({
+          activeScenarioId: scenario.id,
+          gameMode: 'random',
+          currentStage: STAGES.SCENARIO_BRIEFING,
+          planningAnswers: {},
+          hintsUsed: [],
+          quizScore: null,
+          network: initialNetworkState,
+          validationResult: null,
+          scores: initialState.scores,
+          sdnState: null,
+          nfvState: null,
+          orchestrationState: null,
+          simulationState: null,
+        });
+      },
+
+      /** Start practice lab — free-form sandbox without scenario constraints */
+      startPracticeLab() {
+        set({
+          activeScenarioId: null,
+          gameMode: 'practice',
+          currentStage: STAGES.PRACTICE_LAB,
+          planningAnswers: {},
+          hintsUsed: [],
+          quizScore: null,
+          network: initialNetworkState,
+          validationResult: null,
+          scores: initialState.scores,
+          sdnState: null,
+          nfvState: null,
+          orchestrationState: null,
+          simulationState: null,
+        });
+      },
+
+      /** Start learn concepts — standalone concept library */
+      startLearnConcepts() {
+        set({
+          activeScenarioId: null,
+          gameMode: 'learn',
+          currentStage: STAGES.LEARN_CONCEPTS,
+          planningAnswers: {},
+          hintsUsed: [],
+          quizScore: null,
+          network: initialNetworkState,
+          validationResult: null,
+          scores: initialState.scores,
+          sdnState: null,
+          nfvState: null,
+          orchestrationState: null,
+          simulationState: null,
+        });
+      },
+
       /** Hard reset — wipe everything and go home */
       resetAll() {
         set({ ...initialState });
+      },
+
+      // ── Project Management ───────────────────────────────────
+
+      /** Initialize project from URL or create new */
+      initializeProject(projectId, projectName) {
+        set({ projectId, projectName });
+      },
+
+      /** Mark working copy as having unsaved changes */
+      markUnsavedChanges() {
+        set({ unsavedChanges: true });
+      },
+
+      /** Mark working copy as saved (clean) */
+      markSaved() {
+        set({ unsavedChanges: false });
+      },
+
+      /** Set working copy ID and base revision */
+      setWorkingCopy(workingCopyId, baseRevisionId) {
+        set({ workingCopyId, baseRevisionId });
+      },
+
+      /** Set branch name */
+      setBranchName(branchName) {
+        set({ branchName });
+      },
+
+      /** Load project data from a revision or working copy */
+      loadProjectData(data) {
+        set({
+          network: data.network,
+          scenario: data.scenario,
+          planningAnswers: data.planningAnswers,
+          hintsUsed: data.hintsUsed,
+          quizScore: data.quizScore,
+          validationResult: data.validationResult,
+          scores: data.scores,
+          sdnState: data.sdnState,
+          nfvState: data.nfvState,
+          orchestrationState: data.orchestrationState,
+          unsavedChanges: false,
+        });
       },
 
       // ── Planning quiz actions ─────────────────────────────
@@ -190,16 +311,17 @@ export const useGameStore = create(
       // ── Network builder ───────────────────────────────────
 
       setRFNodes(rfNodes) {
-        set((state) => ({ network: { ...state.network, rfNodes } }));
+        set((state) => ({ network: { ...state.network, rfNodes }, unsavedChanges: true }));
       },
 
       setRFEdges(rfEdges) {
-        set((state) => ({ network: { ...state.network, rfEdges } }));
+        set((state) => ({ network: { ...state.network, rfEdges }, unsavedChanges: true }));
       },
 
       setNetworkGraph(graph) {
         set((state) => ({
           network: { ...state.network, graph },
+          unsavedChanges: true,
         }));
       },
 
@@ -211,7 +333,7 @@ export const useGameStore = create(
                 n.id === id ? { ...n, type, config: { ...n.config, ...config } } : n
               )
             : [...state.network.graph.nodes, { id, type, config }];
-          return { network: { ...state.network, graph: { ...state.network.graph, nodes } } };
+          return { network: { ...state.network, graph: { ...state.network.graph, nodes } }, unsavedChanges: true };
         });
       },
 
@@ -226,6 +348,7 @@ export const useGameStore = create(
               ),
             },
           },
+          unsavedChanges: true,
         }));
       },
 
@@ -237,7 +360,7 @@ export const useGameStore = create(
                 e.id === id ? { id, source, target, connectionType } : e
               )
             : [...state.network.graph.edges, { id, source, target, connectionType }];
-          return { network: { ...state.network, graph: { ...state.network.graph, edges } } };
+          return { network: { ...state.network, graph: { ...state.network.graph, edges } }, unsavedChanges: true };
         });
       },
 
@@ -250,6 +373,7 @@ export const useGameStore = create(
               edges: state.network.graph.edges.filter((e) => e.id !== id),
             },
           },
+          unsavedChanges: true,
         }));
       },
 
@@ -463,6 +587,12 @@ export const useGameStore = create(
         }));
       },
 
+      clearSimulationEvents() {
+        set(() => ({
+          simulationState: null,
+        }));
+      },
+
       resolveSimulationEvent(recordId, responseKind) {
         set((state) => ({
           simulationState: state.simulationState
@@ -500,6 +630,13 @@ export const useGameStore = create(
         currentStage: state.currentStage,
         gameMode: state.gameMode,
         activeScenarioId: state.activeScenarioId,
+        // Project management
+        projectId: state.projectId,
+        projectName: state.projectName,
+        workingCopyId: state.workingCopyId,
+        baseRevisionId: state.baseRevisionId,
+        branchName: state.branchName,
+        // Mission state
         planningAnswers: state.planningAnswers,
         hintsUsed: state.hintsUsed,
         quizScore: state.quizScore,

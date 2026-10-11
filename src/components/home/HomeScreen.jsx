@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGameStore, STAGES } from '../../state/gameStore.js';
 import { modeAssets, uiAssets } from '../../assets/assetMap.js';
+import { useCollaboration } from '../../collaboration/CollaborationProvider.jsx';
 
 /**
  * Subtle animated network visualization — a visual
@@ -158,8 +159,13 @@ function ModeCard({ index, icon, title, desc, badge, badgeClass, onClick, primar
 
 export default function HomeScreen() {
   const goToStage = useGameStore((s) => s.goToStage);
+  const startRandomChallenge = useGameStore((s) => s.startRandomChallenge);
+  const startPracticeLab = useGameStore((s) => s.startPracticeLab);
+  const startLearnConcepts = useGameStore((s) => s.startLearnConcepts);
+  const { projectId, isConnected } = useCollaboration();
 
-  const comingSoon = (name) => window.alert(`${name} coming soon!`);
+  // If we have a project ID, show a "Join Project" card
+  const hasProject = !!projectId;
 
   return (
     <div className="home-screen anim-fade-in">
@@ -172,12 +178,24 @@ export default function HomeScreen() {
         <p className="home-hero-sub">
           Learn how to transform real-world requirements into functional network
           architectures, understand the <em>why</em> behind design decisions, and
-          explore modern SDN &amp; NFV concepts.
+          explore modern SDN & NFV concepts.
         </p>
         <HeroNetworkViz />
       </div>
 
       <div className="home-mode-grid">
+        {hasProject && (
+          <ModeCard
+            index={0}
+            icon={modeAssets.scenario}
+            title="Join Shared Project"
+            desc={`Join project ${projectId.slice(0, 8)}... and collaborate in real-time.`}
+            badge={isConnected ? "CONNECTED" : "CONNECTING"}
+            badgeClass={isConnected ? "badge-green" : "badge-warning"}
+            onClick={() => goToStage(STAGES.BUILD)}
+            primary
+          />
+        )}
         <ModeCard
           index={1}
           icon={modeAssets.scenario}
@@ -186,16 +204,16 @@ export default function HomeScreen() {
           badge="RECOMMENDED"
           badgeClass="badge-blue"
           onClick={() => goToStage(STAGES.SCENARIO_SELECT)}
-          primary
+          primary={!hasProject}
         />
         <ModeCard
           index={2}
           icon={modeAssets.random}
           title="Random Challenge"
-          desc="Test your reasoning against procedurally generated requirements and constraints."
+          desc="Test your reasoning against procedurally selected requirements and constraints."
           badge="REPLAYABLE"
           badgeClass="badge-purple"
-          onClick={() => comingSoon('Random Challenge')}
+          onClick={() => startRandomChallenge()}
         />
         <ModeCard
           index={3}
@@ -204,13 +222,13 @@ export default function HomeScreen() {
           desc="Freely experiment with devices, topologies, and SDN/NFV concepts without a strict scenario."
           badge="SANDBOX"
           badgeClass="badge-green"
-          onClick={() => comingSoon('Practice Lab')}
+          onClick={() => startPracticeLab()}
         />
       </div>
 
       <button
         className="home-learn-link"
-        onClick={() => comingSoon('Learn Concepts')}
+        onClick={() => startLearnConcepts()}
       >
         <img src={modeAssets.learn} alt="" className="home-learn-icon" />
         <span>Learn Concepts</span>
