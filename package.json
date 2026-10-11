@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "server": "node node_modules/y-websocket/bin/server.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",
