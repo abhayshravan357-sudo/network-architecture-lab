@@ -13,6 +13,7 @@ import {
   createWorkingCopy, 
   createRevision, 
   listRevisions, 
+  listWorkingCopies,
   getRevision,
   migrateExistingProject,
   extractProjectData 

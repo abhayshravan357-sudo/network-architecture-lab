@@ -139,46 +139,93 @@ export function CollaborationProvider({ children }) {
       console.log('IndexedDB persistence synced');
     });
     
-    // Set up WebSocket provider
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:1234';
-    const provider = new WebsocketProvider(
-      wsUrl,
-      projectId,
-      ydoc,
-      { connect: true, maxBackoffTime: 5000 }
-    );
-    providerRef.current = provider;
+// Set up WebSocket provider
+    const isProduction = import.meta.env.PROD;
+    const configuredWsUrl = import.meta.env.VITE_WS_URL;
     
-    // Connection status handling
-    provider.on('status', (event) => {
-      setConnectionStatus(event.status); // 'connected' | 'disconnected'
-    });
+    // Don't use localhost fallback in production (HTTPS pages can't connect to ws://localhost)
+    const wsUrl = configuredWsUrl || (isProduction ? null : 'ws://localhost:1234');
     
-    // Track peer count via awareness
-    const awareness = provider.awareness;
-    const updatePeerCount = () => {
-      const states = awareness.getStates();
-      // Count other peers (exclude self)
-      const count = states.size - (states.has(ydoc.clientID) ? 1 : 0);
-      setPeerCount(Math.max(0, count));
-    };
-    
-    awareness.on('change', updatePeerCount);
-    updatePeerCount(); // Initial count
-    
-    provider.on('sync', (isSynced) => {
-      setIsSynced(isSynced);
-      if (isSynced && !isInitializedRef.current) {
-        isInitializedRef.current = true;
-        // Initial sync complete - if we have local data, push it
-        const { rfNodes: localNodes, rfEdges: localEdges } = useGameStore.getState().network;
-        if (localNodes.length > 0 || localEdges.length > 0) {
-          isRemoteUpdateRef.current = true;
-          syncToYjs(ydoc, localNodes, localEdges);
-          isRemoteUpdateRef.current = false;
+    let provider = null;
+    if (wsUrl) {
+      provider = new WebsocketProvider(
+        wsUrl,
+        projectId,
+        ydoc,
+        { connect: true, maxBackoffTime: 5000 }
+      );
+      
+      // Connection status handling
+      provider.on('status', (event) => {
+        setConnectionStatus(event.status); // 'connected' | 'disconnected'
+      });
+      
+      // Track peer count via awareness
+      const awareness = provider.awareness;
+      const updatePeerCount = () => {
+        const states = awareness.getStates();
+        // Count other peers (exclude self)
+        const count = states.size - (states.has(ydoc.clientID) ? 1 : 0);
+        setPeerCount(Math.max(0, count));
+      };
+      
+      awareness.on('change', updatePeerCount);
+      updatePeerCount(); // Initial count
+      
+      provider.on('sync', (isSynced) => {
+        setIsSynced(isSynced);
+        if (isSynced && !isInitializedRef.current) {
+          isInitializedRef.current = true;
+          // Initial sync complete - if we have local data, push it
+          const { rfNodes: localNodes, rfEdges: localEdges } = useGameStore.getState().network;
+          if (localNodes.length > 0 || localEdges.length > 0) {
+            isRemoteUpdateRef.current = true;
+            syncToYjs(ydoc, localNodes, localEdges);
+            isRemoteUpdateRef.current = false;
+          }
         }
-      }
-    });
+      });
+    } else {
+      // No WebSocket URL configured - local-only mode
+      setConnectionStatus('offline');
+      setIsSynced(true);
+      isInitializedRef.current = true;
+    }
+    
+    if (provider) {
+      providerRef.current = provider;
+      
+      // Connection status handling
+      provider.on('status', (event) => {
+        setConnectionStatus(event.status); // 'connected' | 'disconnected'
+      });
+      
+      // Track peer count via awareness
+      const awareness = provider.awareness;
+      const updatePeerCount = () => {
+        const states = awareness.getStates();
+        // Count other peers (exclude self)
+        const count = states.size - (states.has(ydoc.clientID) ? 1 : 0);
+        setPeerCount(Math.max(0, count));
+      };
+      
+      awareness.on('change', updatePeerCount);
+      updatePeerCount(); // Initial count
+      
+      provider.on('sync', (isSynced) => {
+        setIsSynced(isSynced);
+        if (isSynced && !isInitializedRef.current) {
+          isInitializedRef.current = true;
+          // Initial sync complete - if we have local data, push it
+          const { rfNodes: localNodes, rfEdges: localEdges } = useGameStore.getState().network;
+          if (localNodes.length > 0 || localEdges.length > 0) {
+            isRemoteUpdateRef.current = true;
+            syncToYjs(ydoc, localNodes, localEdges);
+            isRemoteUpdateRef.current = false;
+          }
+        }
+      });
+    }
     
     // Observe changes from remote peers
     const nodesMap = ydoc.getMap('nodes');
