@@ -3,7 +3,7 @@ import { useGameStore, STAGES } from '../../state/gameStore.js';
 import { getScenario } from '../../data/scenarios/index.js';
 import { applyEvent, scoreSimulation } from '../../engine/simulation/simulationEngine.js';
 import { computeReroute } from '../../engine/sdn/sdnEngine.js';
-import { scaleInstance, applyLoad } from '../../engine/orchestration/orchestratorEngine.js';
+import { resolveScaleResponse } from './scaleResponse.js';
 import { DEVICE_CATALOG_MAP } from '../../data/devices/deviceCatalog.js';
 import { simulationAssets, uiAssets } from '../../assets/assetMap.js';
 
@@ -196,18 +196,13 @@ export default function SimulationStage() {
   };
 
   const handleScaleResponse = (record) => {
-    if (vnfInstances.length === 0) {
-      resolveSimulationEvent(record.recordId, 'observe');
-      return;
-    }
-    const scaled = vnfInstances.map((i) => scaleInstance(i));
-    const applied = applyLoad(scaled, Math.max(0, load - 800));
-    applied.forEach(updateInstance);
-    const stillOverloaded = applied.some((i) => (i.load ?? 0) > i.throughput);
-    resolveSimulationEvent(
-      record.recordId,
-      stillOverloaded ? 'scale-insufficient' : 'scale'
+    const currentLoad = orchestrationState?.load ?? 0;
+    const { applied, responseKind } = resolveScaleResponse(
+      vnfInstances,
+      currentLoad
     );
+    applied.forEach(updateInstance);
+    resolveSimulationEvent(record.recordId, responseKind);
   };
 
   const handleSecurityResponse = (record) => {
