@@ -1,5 +1,46 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
+dist-ssr
+*.local
+
+# Vite
 .vite
+
+# Logs
+*.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+.idea
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Test coverage
+coverage
+
+# Yjs collaboration data
+yjs-data/
+
+# Server logs
+server.log
+preview.log
+
+# Vite
+vite.config.js.timestamp-*.mjs
