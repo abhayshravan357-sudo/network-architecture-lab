@@ -160,18 +160,6 @@ export function CollaborationProvider({ children }) {
         setConnectionStatus(event.status); // 'connected' | 'disconnected'
       });
       
-      // Track peer count via awareness
-      const awareness = provider.awareness;
-      const updatePeerCount = () => {
-        const states = awareness.getStates();
-        // Count other peers (exclude self)
-        const count = states.size - (states.has(ydoc.clientID) ? 1 : 0);
-        setPeerCount(Math.max(0, count));
-      };
-      
-      awareness.on('change', updatePeerCount);
-      updatePeerCount(); // Initial count
-      
       provider.on('sync', (isSynced) => {
         setIsSynced(isSynced);
         if (isSynced && !isInitializedRef.current) {
@@ -281,12 +269,16 @@ export function CollaborationProvider({ children }) {
     return () => {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
       window.__syncToYjs = null;
-      awareness.off('change', updatePeerCount);
-      provider.destroy();
+      if (provider && provider.awareness) {
+        provider.awareness.off('change', updatePeerCount);
+      }
+      if (provider) {
+        provider.destroy();
+      }
       persistence.destroy();
       ydoc.destroy();
     };
-  }, [projectId]);
+}, [projectId]);
   
   // Sync local Zustand changes to Yjs - debounced
   useEffect(() => {
@@ -305,7 +297,7 @@ export function CollaborationProvider({ children }) {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
   }, [rfNodes, rfEdges]);
-  
+
   // Expose collaboration status and actions
   const value = useMemo(() => ({
     projectId,
@@ -314,7 +306,7 @@ export function CollaborationProvider({ children }) {
     isConnected: connectionStatus === 'connected',
     peerCount, // Number of other connected users
   }), [projectId, connectionStatus, isSynced, peerCount]);
-  
+
   return (
     <CollaborationContext.Provider value={value}>
       {children}
