@@ -6,7 +6,7 @@ import ReactFlow, {
   MiniMap,
   addEdge,
   applyNodeChanges,
-  applyEdgeChanges
+  applyEdgeChanges,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -15,6 +15,12 @@ import { getScenario } from '../../data/scenarios/index.js';
 import { getDeviceDef } from '../../data/devices/deviceCatalog.js';
 import { deviceAssets } from '../../assets/assetMap.js';
 import { useCollaboration, useSyncToYjs } from '../../collaboration/CollaborationProvider.jsx';
+import { loadSolution, solutionExistsOnCanvas } from '../../data/scenarios/solutionAdapter.js';
+import { smallOfficeSolution } from '../../data/scenarios/smallOfficeSolution.js';
+import { collegeCampusSolution } from '../../data/scenarios/collegeCampusSolution.js';
+import { hospitalSolution } from '../../data/scenarios/hospitalSolution.js';
+import { hotelSolution } from '../../data/scenarios/hotelSolution.js';
+import { multiBranchSolution } from '../../data/scenarios/multiBranchSolution.js';
 import DeviceNode from './DeviceNode.jsx';
 import DeviceConsole from './DeviceConsole.jsx';
 
@@ -210,6 +216,89 @@ function ConfigPanel({ selectedNode, updateNodeData }) {
 }
 
 // ── Main Network Builder Component ───────────────────────────────────────────
+
+// Solution Explanation Panel Component
+function SolutionExplanationPanel({ explanation, onClose }) {
+  return (
+    <div className="config-panel" style={{ maxHeight: '100%', overflow: 'auto' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '16px',
+        paddingBottom: '12px',
+        borderBottom: '1px solid var(--c-border)'
+      }}>
+        <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>Architecture Explanation</h3>
+        <button 
+          className="btn btn-ghost btn-sm" 
+          onClick={onClose}
+          style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+        >
+          Close
+        </button>
+      </div>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Overview */}
+        <div>
+          <h4 style={{ margin: '0 0 8px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--c-text-dim)' }}>Overview</h4>
+          <p style={{ margin: 0, fontSize: '0.8rem', lineHeight: 1.5, color: 'var(--c-text)' }}>{explanation.overview}</p>
+        </div>
+        
+        {/* Traffic Flow */}
+        <div>
+          <h4 style={{ margin: '0 0 8px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--c-text-dim)' }}>Traffic Flow</h4>
+          <p style={{ margin: 0, fontSize: '0.8rem', lineHeight: 1.5, color: 'var(--c-text)', fontFamily: 'monospace' }}>{explanation.trafficFlow}</p>
+        </div>
+        
+        {/* Device Roles */}
+        <div>
+          <h4 style={{ margin: '0 0 8px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--c-text-dim)' }}>Device Roles</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {Object.entries(explanation.deviceRoles || {}).map(([id, role]) => (
+              <div key={id} style={{ 
+                padding: '8px 10px', 
+                background: 'var(--c-bg-glass)', 
+                border: '1px solid var(--c-border)', 
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.75rem',
+                lineHeight: 1.4
+              }}>
+                <strong style={{ color: 'var(--c-accent)' }}>{id}:</strong> {role}
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Key Insights */}
+        {explanation.keyInsights && explanation.keyInsights.length > 0 && (
+          <div>
+            <h4 style={{ margin: '0 0 8px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--c-text-dim)' }}>Key Insights</h4>
+            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--c-text)' }}>
+              {explanation.keyInsights.map((insight, idx) => (
+                <li key={idx}>{insight}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {/* Validation Notes */}
+        {explanation.validationNotes && explanation.validationNotes.length > 0 && (
+          <div>
+            <h4 style={{ margin: '0 0 8px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--c-success)' }}>Validation Results</h4>
+            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--c-success)' }}>
+              {explanation.validationNotes.map((note, idx) => (
+                <li key={idx}>✓ {note}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function NetworkBuilder() {
   const reactFlowWrapper = useRef(null);
   const syncToYjs = useSyncToYjs();
@@ -220,12 +309,24 @@ export default function NetworkBuilder() {
   const setRFNodes = useGameStore((s) => s.setRFNodes);
   const setRFEdges = useGameStore((s) => s.setRFEdges);
   const setNetworkGraph = useGameStore((s) => s.setNetworkGraph);
+  const deleteNode = useGameStore((s) => s.deleteNode);
+  const deleteEdge = useGameStore((s) => s.deleteEdge);
+  const undo = useGameStore((s) => s.undo);
+  const redo = useGameStore((s) => s.redo);
+  const save = useGameStore((s) => s.save);
+  const duplicateNode = useGameStore((s) => s.duplicateNode);
+  const loadSolution = useGameStore((s) => s.loadSolution);
+  const unsavedChanges = useGameStore((s) => s.unsavedChanges);
+  const { past, future } = useGameStore((s) => s.network.history);
 
   const nodes = useGameStore((s) => s.network.rfNodes);
   const edges = useGameStore((s) => s.network.rfEdges);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [activeRightTab, setActiveRightTab] = useState('config');
   const [consoleNodeId, setConsoleNodeId] = useState(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState([]);
+  const [selectedEdgeIds, setSelectedEdgeIds] = useState([]);
+  const [solutionExplanation, setSolutionExplanation] = useState(null);
   const hasFittedView = useRef(false);
 
   // Sync to Yjs when nodes/edges change
@@ -301,6 +402,153 @@ export default function NetworkBuilder() {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  const onSelectionChange = useCallback(({ nodes: selectedNodes, edges: selectedEdges }) => {
+    setSelectedNodeIds(selectedNodes.map((n) => n.id));
+    setSelectedEdgeIds(selectedEdges.map((e) => e.id));
+  }, []);
+
+  // Canvas control functions (defined before handleKeyDown to avoid temporal dead zone)
+  const handleFitView = useCallback(() => {
+    if (reactFlowInstance) {
+      reactFlowInstance.fitView({ padding: 0.2 });
+    }
+  }, [reactFlowInstance]);
+
+  const handleResetViewport = useCallback(() => {
+    if (reactFlowInstance) {
+      reactFlowInstance.setViewport({ x: 0, y: 0, zoom: 1 });
+    }
+  }, [reactFlowInstance]);
+
+  const handleClearCanvas = useCallback(() => {
+    if (window.confirm('Clear the entire canvas? This will remove all devices and connections.')) {
+      setRFNodes([]);
+      setRFEdges([]);
+      setSelectedNodeIds([]);
+      setSelectedEdgeIds([]);
+    }
+  }, [setRFNodes, setRFEdges]);
+
+  const handleLoadSolution = useCallback(() => {
+    if (!activeScenarioId) return;
+    
+    let solution = null;
+    switch (activeScenarioId) {
+      case 'small-office':
+        solution = smallOfficeSolution;
+        break;
+      case 'college-campus':
+        solution = collegeCampusSolution;
+        break;
+      case 'hospital':
+        solution = hospitalSolution;
+        break;
+      case 'hotel':
+        solution = hotelSolution;
+        break;
+      case 'multi-branch':
+        solution = multiBranchSolution;
+        break;
+    }
+    
+    if (!solution) {
+      alert('Solution not yet available for this scenario.');
+      return;
+    }
+    
+    // Check if solution already exists on canvas
+    if (solutionExistsOnCanvas(solution, nodes, edges)) {
+      alert('Solution already loaded.');
+      return;
+    }
+    
+    // Confirm if unsaved changes
+    if (unsavedChanges && !window.confirm('Load solution? This will replace your current topology and all stage configurations.')) {
+      return;
+    }
+    
+    // Load solution via store action (clears history + populates all stages)
+    loadSolution(solution.nodes, solution.edges, solution.stageStates);
+    
+    // Show explanation panel
+    setSolutionExplanation(solution.explanation);
+  }, [activeScenarioId, nodes, edges, unsavedChanges, loadSolution]);
+
+  const handleKeyDown = useCallback((event) => {
+    // Don't trigger shortcuts when typing in inputs
+    const target = event.target;
+    const isInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable;
+    if (isInput) return;
+
+    // Save: Ctrl+S
+    if (event.key === 's' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      save();
+      return;
+    }
+
+    // Undo: Ctrl+Z
+    if (event.key === 'z' && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
+      event.preventDefault();
+      undo();
+      return;
+    }
+
+    // Redo: Ctrl+Shift+Z or Ctrl+Y
+    if (
+      (event.key === 'z' && (event.ctrlKey || event.metaKey) && event.shiftKey) ||
+      (event.key === 'y' && (event.ctrlKey || event.metaKey))
+    ) {
+      event.preventDefault();
+      redo();
+      return;
+    }
+
+    // Duplicate: Ctrl+D
+    if (event.key === 'd' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      if (selectedNodeIds.length === 1) {
+        duplicateNode(selectedNodeIds[0]);
+      }
+      return;
+    }
+
+    // Fit View: F key
+    if (event.key === 'f' && !(event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) {
+      event.preventDefault();
+      handleFitView();
+      return;
+    }
+
+    // Reset Viewport: R key
+    if (event.key === 'r' && !(event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) {
+      event.preventDefault();
+      handleResetViewport();
+      return;
+    }
+
+    // Delete selected: Delete or Backspace
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      selectedNodeIds.forEach((id) => deleteNode(id));
+      selectedEdgeIds.forEach((id) => deleteEdge(id));
+      setSelectedNodeIds([]);
+      setSelectedEdgeIds([]);
+    }
+
+    // Escape: Clear selection
+    if (event.key === 'Escape') {
+      setSelectedNodeIds([]);
+      setSelectedEdgeIds([]);
+    }
+  }, [selectedNodeIds, selectedEdgeIds, deleteNode, deleteEdge, undo, redo, save, duplicateNode, handleFitView, handleResetViewport]);
+
+  // Global keyboard handler for Delete key
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
@@ -341,6 +589,8 @@ export default function NetworkBuilder() {
   }, [setRFNodes]);
 
   const selectedNode = nodes.find(n => n.selected);
+  const selectedNodeCount = selectedNodeIds.length;
+  const selectedEdgeCount = selectedEdgeIds.length;
   const consoleNode = consoleNodeId ? nodes.find(n => n.id === consoleNodeId) : null;
 
   const openConsole = (nodeId) => {
@@ -389,6 +639,7 @@ export default function NetworkBuilder() {
           onInit={setReactFlowInstance}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={{ type: 'straight', animated: false }}
         >
@@ -453,6 +704,14 @@ export default function NetworkBuilder() {
           >
             Console
           </button>
+          {solutionExplanation && (
+            <button
+              className={`config-panel-tab ${activeRightTab === 'solution' ? 'active' : ''}`}
+              onClick={() => setActiveRightTab('solution')}
+            >
+              Solution
+            </button>
+          )}
         </div>
 
         <div className="config-panel-content">
@@ -471,6 +730,12 @@ export default function NetworkBuilder() {
               Select a device on the canvas to open its console.
             </div>
           )}
+          {activeRightTab === 'solution' && solutionExplanation && (
+            <SolutionExplanationPanel 
+              explanation={solutionExplanation} 
+              onClose={() => setActiveRightTab('config')} 
+            />
+          )}
         </div>
       </aside>
 
@@ -483,7 +748,14 @@ export default function NetworkBuilder() {
           <div className="builder-stat">
             Links <span className="builder-stat-value">{edges.length}</span>
           </div>
-          {selectedNode && (
+          {(selectedNodeCount > 0 || selectedEdgeCount > 0) && (
+            <div className="builder-stat" style={{ color: 'var(--c-warning)' }}>
+              Selected: {selectedNodeCount > 0 && <span>{selectedNodeCount} node(s)</span>}
+              {selectedNodeCount > 0 && selectedEdgeCount > 0 && <span>, </span>}
+              {selectedEdgeCount > 0 && <span>{selectedEdgeCount} link(s)</span>}
+            </div>
+          )}
+          {selectedNode && selectedNodeCount <= 1 && (
             <div className="builder-stat" style={{ color: 'var(--c-accent-soft)' }}>
               Selected: <span className="builder-stat-value">{selectedNode.data.label || selectedNode.data.type}</span>
             </div>
@@ -501,6 +773,79 @@ export default function NetworkBuilder() {
               Connect devices to build paths.
             </span>
           )}
+          {unsavedChanges && (
+            <button
+              className="btn btn-success btn-sm"
+              onClick={save}
+              title="Save (Ctrl+S)"
+            >
+              Save
+            </button>
+          )}
+          {activeScenarioId && (
+            <button
+              className="btn btn-accent btn-sm"
+              onClick={handleLoadSolution}
+              title="Show Correct Architecture"
+            >
+              Show Correct Architecture
+            </button>
+          )}
+          {(nodes.length > 0 || edges.length > 0) && (
+            <>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={handleFitView}
+                title="Fit View (F)"
+              >
+                Fit View
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={handleResetViewport}
+                title="Reset Viewport (R)"
+              >
+                Reset View
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={handleClearCanvas}
+                title="Clear Canvas"
+              >
+                Clear Canvas
+              </button>
+            </>
+          )}
+          {(selectedNodeCount > 0 || selectedEdgeCount > 0) && (
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => {
+                selectedNodeIds.forEach((id) => deleteNode(id));
+                selectedEdgeIds.forEach((id) => deleteEdge(id));
+                setSelectedNodeIds([]);
+                setSelectedEdgeIds([]);
+              }}
+              title="Delete selected (Del)"
+            >
+              Delete
+            </button>
+          )}
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={undo}
+            disabled={past.length === 0}
+            title="Undo (Ctrl+Z)"
+          >
+            Undo
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={redo}
+            disabled={future.length === 0}
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            Redo
+          </button>
           <button
             className="btn btn-primary"
             onClick={handleValidate}

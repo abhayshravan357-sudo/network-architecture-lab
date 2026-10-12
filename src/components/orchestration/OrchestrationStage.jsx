@@ -72,7 +72,7 @@ export default function OrchestrationStage() {
   };
 
   const handleLoadChange = (newLoad) => {
-    applyCurrentLoad(instances, Number(newLoad));
+    applyCurrentLoad(activeInstances, Number(newLoad));
   };
 
   const handleScale = (inst) => {
@@ -168,7 +168,7 @@ export default function OrchestrationStage() {
           </div>
           <div style={{ flex: 1, minWidth: 260, maxWidth: 420 }}>
             <div className="eyebrow" style={{ marginBottom: 6 }}>
-              Simulated Traffic Load: <span className="mono">{load.toLocaleString()}</span> users
+              Simulated Traffic Load: <span className="mono">{load.toLocaleString()}</span> concurrent users
             </div>
             <input
               type="range"
@@ -228,7 +228,10 @@ export default function OrchestrationStage() {
               {/* utilization bar */}
               <div style={{ marginBottom: 6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--c-text-dim)' }}>
-                  <span>Load</span><span className="mono">{inst.load.toLocaleString()} / {inst.throughput.toLocaleString()}</span>
+                  <span>Load</span>
+                  <span className="mono">
+                    {(inst.load ?? 0).toLocaleString()} / {(inst.throughput ?? 0).toLocaleString()}
+                  </span>
                 </div>
                 <div style={{ height: 8, borderRadius: 4, background: 'var(--c-bg-deep)', overflow: 'hidden' }}>
                   <div style={{
@@ -278,9 +281,14 @@ export default function OrchestrationStage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
               {[...actions].reverse().map((a, i) => (
-                <div key={i} className="check-item" style={{ fontSize: '0.84rem' }}>
+                <div key={i} className="check-item" style={{ fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span className="chip" style={{ fontSize: '0.7rem' }}>{a.kind}</span>
                   <span className="mono">{a.instanceId}</span>
+                  {a.timestamp && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--c-text-dim)' }}>
+                      {new Date(a.timestamp).toLocaleTimeString()}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -298,7 +306,7 @@ export default function OrchestrationStage() {
           <div className="score-dimensions" style={{ marginTop: 12 }}>
             <div className="score-dimension"><span className="score-dimension-label">Stability</span><span className="score-dimension-value">{score.stability}%</span></div>
             <div className="score-dimension"><span className="score-dimension-label">Scaling</span><span className="score-dimension-value">{score.scaling}%</span></div>
-            <div className="score-dimension"><span className="score-dimension-label">Lifecycle</span><span className="score-dimension-value">{score.lifecycle}%</span></div>
+            <div className="score-dimension"><span className="score-dimension-label">Lifecycle</span><span className="score-dimension-value">{typeof score.lifecycle === 'number' ? score.lifecycle.toFixed(1) : score.lifecycle}%</span></div>
           </div>
           <button className="btn btn-primary btn-lg" style={{ marginTop: 16, width: '100%' }} onClick={() => { saveOrchestrationResult(score); goToStage(STAGES.SIMULATION); }}>
             Continue to Simulation →

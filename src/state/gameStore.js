@@ -80,6 +80,11 @@ const initialNetworkState = {
   },
   /** Resource pool — how many of each device remain */
   remainingResources: {},
+  /** Undo/Redo history */
+  history: {
+    past: [],
+    future: [],
+  },
 };
 
 const initialState = {
@@ -261,6 +266,11 @@ export const useGameStore = create(
         set({ unsavedChanges: false });
       },
 
+      /** Explicit save - marks clean and triggers persist */
+      save() {
+        set({ unsavedChanges: false });
+      },
+
       /** Set working copy ID and base revision */
       setWorkingCopy(workingCopyId, baseRevisionId) {
         set({ workingCopyId, baseRevisionId });
@@ -274,7 +284,10 @@ export const useGameStore = create(
       /** Load project data from a revision or working copy */
       loadProjectData(data) {
         set({
-          network: data.network,
+          network: {
+            ...data.network,
+            history: { past: [], future: [] },
+          },
           scenario: data.scenario,
           planningAnswers: data.planningAnswers,
           hintsUsed: data.hintsUsed,
@@ -310,12 +323,107 @@ export const useGameStore = create(
 
       // ── Network builder ───────────────────────────────────
 
+      /** Push current network state to history for undo */
+      pushHistory() {
+        set((state) => {
+          const { rfNodes, rfEdges, history } = state.network;
+          const newPast = [...history.past, { rfNodes, rfEdges }];
+          // Limit history to 50 entries
+          if (newPast.length > 50) newPast.shift();
+          return {
+            network: {
+              ...state.network,
+              history: { past: newPast, future: [] },
+            },
+            unsavedChanges: true,
+          };
+        });
+      },
+
+      /** Undo last network change */
+      undo() {
+        set((state) => {
+          const { past, future } = state.network.history;
+          if (past.length === 0) return state;
+          const previous = past[past.length - 1];
+          const newPast = past.slice(0, -1);
+          const newFuture = [{ rfNodes: state.network.rfNodes, rfEdges: state.network.rfEdges }, ...future];
+          return {
+            network: {
+              ...state.network,
+              rfNodes: previous.rfNodes,
+              rfEdges: previous.rfEdges,
+              history: { past: newPast, future: newFuture },
+            },
+            unsavedChanges: true,
+          };
+        });
+      },
+
+      /** Redo last undone network change */
+      redo() {
+        set((state) => {
+          const { past, future } = state.network.history;
+          if (future.length === 0) return state;
+          const next = future[0];
+          const newFuture = future.slice(1);
+          const newPast = [...past, { rfNodes: state.network.rfNodes, rfEdges: state.network.rfEdges }];
+          return {
+            network: {
+              ...state.network,
+              rfNodes: next.rfNodes,
+              rfEdges: next.rfEdges,
+              history: { past: newPast, future: newFuture },
+            },
+            unsavedChanges: true,
+          };
+        });
+      },
+
+      /** Clear history (call on scenario load, revision load, etc.) */
+      clearHistory() {
+        set((state) => ({
+          network: {
+            ...state.network,
+            history: { past: [], future: [] },
+          },
+        }));
+      },
+
+      /** Load a scenario solution (replaces current topology + all stage states) */
+      loadSolution(nodes, edges, stageStates = {}) {
+        set((state) => ({
+          network: {
+            ...state.network,
+            rfNodes: nodes,
+            rfEdges: edges,
+            history: { past: [], future: [] },
+          },
+          // Populate all stage states for 100% validation
+          sdnState: stageStates.sdnState ?? { controllerPlaced: true, flowRules: [], policyFlows: [], policies: [], sdnEvents: [] },
+          nfvState: stageStates.nfvState ?? { deployments: [], serviceChain: [] },
+          orchestrationState: stageStates.orchestrationState ?? { instances: [], actions: [], load: 0 },
+          simulationState: stageStates.simulationState ?? { events: [], graphAfter: null },
+          unsavedChanges: true,
+        }));
+      },
+
       setRFNodes(rfNodes) {
-        set((state) => ({ network: { ...state.network, rfNodes }, unsavedChanges: true }));
+        set((state) => {
+          const { past, future } = state.network.history;
+          const newPast = [...past, { rfNodes: state.network.rfNodes, rfEdges: state.network.rfEdges }];
+          if (newPast.length > 50) newPast.shift();
+          return { network: { ...state.network, rfNodes, history: { past: newPast, future: [] } }, unsavedChanges: true };
+        });
       },
 
       setRFEdges(rfEdges) {
-        set((state) => ({ network: { ...state.network, rfEdges }, unsavedChanges: true }));
+        set((state) => {
+          const { past, future } = state.network.history;
+          const newPast = [...past, { rfNodes: state.network.rfNodes, rfEdges: state.network.rfEdges }];
+          if (newPast.length > 50) newPast.shift();
+          return { network: { ...state.network, rfEdges, history: { past: newPast, future: [] } }, unsavedChanges: true };
+        });
       },
 
       setNetworkGraph(graph) {
@@ -375,6 +483,78 @@ export const useGameStore = create(
           },
           unsavedChanges: true,
         }));
+      },
+
+      deleteNode(nodeId) {
+        set((state) => {
+          const { past, future } = state.network.history;
+          const newPast = [...past, { rfNodes: state.network.rfNodes, rfEdges: state.network.rfEdges }];
+          if (newPast.length > 50) newPast.shift();
+          return {
+            network: {
+              ...state.network,
+              rfNodes: state.network.rfNodes.filter((n) => n.id !== nodeId),
+              rfEdges: state.network.rfEdges.filter(
+                (e) => e.source !== nodeId && e.target !== nodeId
+              ),
+              graph: {
+                ...state.network.graph,
+                nodes: state.network.graph.nodes.filter((n) => n.id !== nodeId),
+                edges: state.network.graph.edges.filter(
+                  (e) => e.source !== nodeId && e.target !== nodeId
+                ),
+              },
+              history: { past: newPast, future: [] },
+            },
+            unsavedChanges: true,
+          };
+        });
+      },
+
+      deleteEdge(edgeId) {
+        set((state) => {
+          const { past, future } = state.network.history;
+          const newPast = [...past, { rfNodes: state.network.rfNodes, rfEdges: state.network.rfEdges }];
+          if (newPast.length > 50) newPast.shift();
+          return {
+            network: {
+              ...state.network,
+              rfEdges: state.network.rfEdges.filter((e) => e.id !== edgeId),
+              graph: {
+                ...state.network.graph,
+                edges: state.network.graph.edges.filter((e) => e.id !== edgeId),
+              },
+              history: { past: newPast, future: [] },
+            },
+            unsavedChanges: true,
+          };
+        });
+      },
+
+      /** Duplicate a node with offset position */
+      duplicateNode(nodeId) {
+        set((state) => {
+          const node = state.network.rfNodes.find((n) => n.id === nodeId);
+          if (!node) return state;
+          const { past, future } = state.network.history;
+          const newPast = [...past, { rfNodes: state.network.rfNodes, rfEdges: state.network.rfEdges }];
+          if (newPast.length > 50) newPast.shift();
+          const newNode = {
+            ...node,
+            id: `${node.data.type}-${Date.now()}`,
+            position: { x: node.position.x + 40, y: node.position.y + 40 },
+            data: { ...node.data, label: `${node.data.label} (copy)` },
+            selected: false,
+          };
+          return {
+            network: {
+              ...state.network,
+              rfNodes: [...state.network.rfNodes, newNode],
+              history: { past: newPast, future: [] },
+            },
+            unsavedChanges: true,
+          };
+        });
       },
 
       // ── Validation ────────────────────────────────────────
@@ -640,7 +820,10 @@ export const useGameStore = create(
         planningAnswers: state.planningAnswers,
         hintsUsed: state.hintsUsed,
         quizScore: state.quizScore,
-        network: state.network,
+        network: {
+          ...state.network,
+          history: { past: [], future: [] }, // Don't persist history
+        },
         validationResult: state.validationResult,
         scores: state.scores,
         sdnState: state.sdnState,

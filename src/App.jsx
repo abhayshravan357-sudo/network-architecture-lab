@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback } from 'react';
 import { useGameStore, STAGES, STAGE_ORDER, STAGE_LABELS } from './state/gameStore.js';
 import { uiAssets } from './assets/assetMap.js';
 import ProgressBar from './components/ui/ProgressBar.jsx';
@@ -74,14 +74,25 @@ function TopNav() {
   const showBreadcrumb = BREADCRUMB_STAGES.includes(currentStage);
   const currentIdx = STAGE_ORDER.indexOf(currentStage);
 
-  const handleBrandClick = () => {
-    if (activeScenarioId && currentStage !== STAGES.HOME) {
-      if (window.confirm('Return to home? Your progress will be saved.')) {
-        goToHome();
+  // Helper to confirm navigation when unsaved changes exist
+  const confirmNavigation = useCallback((action) => {
+    if (unsavedChanges) {
+      if (window.confirm('You have unsaved changes. Discard changes and navigate away?')) {
+        action();
       }
     } else {
-      goToHome();
+      action();
     }
+  }, [unsavedChanges]);
+
+  const handleBrandClick = () => {
+    confirmNavigation(() => {
+      if (activeScenarioId && currentStage !== STAGES.HOME) {
+        goToHome();
+      } else {
+        goToHome();
+      }
+    });
   };
 
   // Dialog states
@@ -231,7 +242,7 @@ function TopNav() {
                   <button
                     className={`topnav-stage ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
                     style={{ background: 'none', border: isActive ? undefined : 'none', cursor: isReachable ? 'pointer' : 'default', padding: isActive ? undefined : '4px 6px' }}
-                    onClick={() => isReachable && goToStage(stage)}
+                    onClick={() => isReachable && confirmNavigation(() => goToStage(stage))}
                     title={isCompleted ? `Go back to ${STAGE_LABELS[stage]}` : STAGE_LABELS[stage]}
                     disabled={!isReachable}
                   >
@@ -269,7 +280,7 @@ function TopNav() {
         {activeScenarioId && currentStage !== STAGES.HOME && (
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => { if (window.confirm('Abandon this mission? Progress will be reset.')) resetAll(); }}
+            onClick={() => confirmNavigation(() => { if (window.confirm('Abandon this mission? Progress will be reset.')) resetAll(); })}
             title="Abandon mission"
           >
             ✕ Quit
@@ -354,7 +365,21 @@ function AppInner() {
   const initializeProject = useGameStore((s) => s.initializeProject);
   const setWorkingCopy = useGameStore((s) => s.setWorkingCopy);
   const markSaved = useGameStore((s) => s.markSaved);
+  const unsavedChanges = useGameStore((s) => s.unsavedChanges);
   const { isConnected } = useCollaboration();
+
+  // Beforeunload handler for unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (unsavedChanges) {
+        event.preventDefault();
+        event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return event.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [unsavedChanges]);
 
   // Initialize project on first load
   useEffect(() => {

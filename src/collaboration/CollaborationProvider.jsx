@@ -7,12 +7,43 @@ import { NetworkGraph } from '../engine/graph/graphModel.js';
 
 const CollaborationContext = createContext(null);
 
+// Robust UUID v4 generator compatible with all browser contexts
+function generateUUID() {
+  // Use native crypto.randomUUID() if available (secure contexts only)
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {
+      // Fall through to fallback
+    }
+  }
+  
+  // Fallback: generate UUID v4 using crypto.getRandomValues()
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    // Set version (4) and variant (10) bits per RFC 4122
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+  
+  // Final fallback: Math.random() based UUID (not cryptographically secure)
+  // Only used in very old browsers without crypto APIs
+  console.warn('crypto APIs unavailable, using insecure Math.random() UUID fallback');
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Generate a stable project ID from URL or create new one
 const getProjectId = () => {
   const params = new URLSearchParams(window.location.search);
   let projectId = params.get('project');
   if (!projectId) {
-    projectId = crypto.randomUUID();
+    projectId = generateUUID();
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('project', projectId);
     window.history.replaceState({}, '', newUrl);
@@ -147,6 +178,9 @@ export function CollaborationProvider({ children }) {
     const wsUrl = configuredWsUrl || (isProduction ? null : 'ws://localhost:1234');
     
     let provider = null;
+    let awareness = null;
+    let updatePeerCount = null;
+    
     if (wsUrl) {
       provider = new WebsocketProvider(
         wsUrl,
@@ -189,8 +223,8 @@ export function CollaborationProvider({ children }) {
       });
       
       // Track peer count via awareness
-      const awareness = provider.awareness;
-      const updatePeerCount = () => {
+      awareness = provider.awareness;
+      updatePeerCount = () => {
         const states = awareness.getStates();
         // Count other peers (exclude self)
         const count = states.size - (states.has(ydoc.clientID) ? 1 : 0);

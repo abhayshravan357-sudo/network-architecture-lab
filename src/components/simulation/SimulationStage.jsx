@@ -1,10 +1,54 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, Component } from 'react';
 import { useGameStore, STAGES } from '../../state/gameStore.js';
 import { getScenario } from '../../data/scenarios/index.js';
 import { tracePacket, applyEvent } from '../../engine/simulation/simulationEngine.js';
 import { FAULT_TYPES, applyFault, findFirstDivergence } from './faultInjection.js';
 import AnimatedNetworkSimulation from './AnimatedNetworkSimulation.jsx';
 import { DEVICE_CATALOG_MAP } from '../../data/devices/deviceCatalog.js';
+
+// Error Boundary for AnimatedNetworkSimulation - uses key-based remount
+class SimulationErrorBoundary extends Component {
+  state = { hasError: false, error: null, key: 0 };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Simulation error:', error, errorInfo);
+  }
+
+  reset = () => {
+    this.setState((prev) => ({ hasError: false, error: null, key: prev.key + 1 }));
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="page-inner anim-fade-in">
+          <div className="panel" style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div className="eyebrow" style={{ marginBottom: 12, color: 'var(--c-warning)' }}>Simulation Error</div>
+            <h2>Something went wrong with the animated journey</h2>
+            <p style={{ color: 'var(--c-text-muted)', margin: '16px 0' }}>
+              {this.state.error?.message ?? 'Unknown error'}
+            </p>
+            <pre style={{ textAlign: 'left', background: 'var(--c-bg-elevated)', padding: '12px', borderRadius: 'var(--radius-md)', overflow: 'auto', fontSize: '0.7rem', color: 'var(--c-text-dim)' }}>
+              {this.state.error?.stack}
+            </pre>
+            <button className="btn btn-primary" onClick={this.reset}>
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    // Support render prop pattern for key
+    if (typeof this.props.children === 'function') {
+      return this.props.children({ key: this.state.key });
+    }
+    return this.props.children;
+  }
+}
 
 /* Map engine event ids to readable labels. */
 const EVENT_TYPE_LABELS = {
@@ -241,6 +285,30 @@ export default function SimulationStage() {
     goToStage(STAGES.RESULTS);
   };
 
+  /* ─── Metrics (must be before early return for hook consistency) ─── */
+  const metrics = useMemo(() => {
+    const eventCount = activeEvents.length;
+    const hasActiveEvent = eventCount > 0;
+    const affectedNodes = activeEvents.reduce((acc, evt) => {
+      const mapped = mapEventToEngine(evt.eventId);
+      const magnitude = mapped.magnitude;
+      if (magnitude >= 75) acc.critical += 1;
+      else if (magnitude >= 50) acc.high += 1;
+      else if (magnitude >= 25) acc.warning += 1;
+      else acc.info += 1;
+      return acc;
+    }, { critical: 0, high: 0, warning: 0, info: 0 });
+
+    return {
+      eventCount,
+      hasActiveEvent,
+      affectedNodes,
+      activeSeverity: hasActiveEvent
+        ? mapEventToEngine(activeEvents[activeEvents.length - 1].eventId).severity
+        : null,
+    };
+  }, [activeEvents]);
+
   /* ─── Journey (animated) mode ─────────────────────────── */
   if (simulationMode === 'journey') {
     if (!readiness.ready) {
@@ -295,43 +363,26 @@ export default function SimulationStage() {
     }
 
     return (
-      <AnimatedNetworkSimulation
-        graphData={graph}
-        layoutNodes={network.rfNodes}
-        layoutEdges={network.rfEdges}
-        sdnState={sdnState}
-        nfvState={nfvState}
-        orchestrationState={orchestrationState}
-        initialSourceId={traceFrom || undefined}
-        initialTargetId={traceTo || undefined}
-        onExit={() => setSimulationMode('events')}
-      />
+      <SimulationErrorBoundary>
+        {({ key }) => (
+          <AnimatedNetworkSimulation
+            key={key}
+            graphData={graph}
+            layoutNodes={network.rfNodes}
+            layoutEdges={network.rfEdges}
+            sdnState={sdnState}
+            nfvState={nfvState}
+            orchestrationState={orchestrationState}
+            initialSourceId={traceFrom || undefined}
+            initialTargetId={traceTo || undefined}
+            onExit={() => setSimulationMode('events')}
+          />
+        )}
+      </SimulationErrorBoundary>
     );
   }
 
   /* ─── Event-driven simulation mode ─────────────────────── */
-  const metrics = useMemo(() => {
-    const eventCount = activeEvents.length;
-    const hasActiveEvent = eventCount > 0;
-    const affectedNodes = activeEvents.reduce((acc, evt) => {
-      const mapped = mapEventToEngine(evt.eventId);
-      const magnitude = mapped.magnitude;
-      if (magnitude >= 75) acc.critical += 1;
-      else if (magnitude >= 50) acc.high += 1;
-      else if (magnitude >= 25) acc.warning += 1;
-      else acc.info += 1;
-      return acc;
-    }, { critical: 0, high: 0, warning: 0, info: 0 });
-
-    return {
-      eventCount,
-      hasActiveEvent,
-      affectedNodes,
-      activeSeverity: hasActiveEvent
-        ? mapEventToEngine(activeEvents[activeEvents.length - 1].eventId).severity
-        : null,
-    };
-  }, [activeEvents]);
 
   return (
     <div className="page-inner anim-fade-in">
